@@ -17,7 +17,7 @@ import { View } from 'react-native';
 export default function RootLayout() {
   return (
     // Main container with dark background
-    <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
+    <View style={{ flex: 1, backgroundColor: '#000000' }}>
       {/* 
         StatusBar: The top bar showing time, battery, etc.
         style="light" means white text (for dark backgrounds)
@@ -27,14 +27,16 @@ export default function RootLayout() {
       {/* 
         Stack Navigator: Manages screen transitions
         - "(tabs)" is a special route that contains our tab navigation
-        - "thread/[id]" is a dynamic route - [id] becomes a variable
+        - "rabbit-hole/[id]" displays a rabbit hole with its episodes
+        - "episode/[id]" displays individual episode content
+        - "thread/[id]" is legacy route for Wikipedia articles
       */}
       <Stack
         screenOptions={{
           // Don't show the default header - we'll make our own
           headerShown: false,
           // Dark background for the navigation area
-          contentStyle: { backgroundColor: '#0a0a0a' },
+          contentStyle: { backgroundColor: '#000000' },
         }}
       >
         {/* 
@@ -44,16 +46,41 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         
         {/* 
-          Thread screen - for viewing full articles
-          [id] is a dynamic segment - it captures the article ID from the URL
+          Rabbit Hole screen - shows the full rabbit hole with episodes
+          [id] captures the rabbit hole ID from the URL
+          Example: /rabbit-hole/abc-123 → id = "abc-123"
+        */}
+        <Stack.Screen 
+          name="rabbit-hole/[id]" 
+          options={{
+            gestureEnabled: true,
+            animation: 'slide_from_right',
+          }}
+        />
+        
+        {/* 
+          Episode screen - for reading full episode content
+          [id] captures the episode ID from the URL
+          Example: /episode/xyz-456 → id = "xyz-456"
+        */}
+        <Stack.Screen 
+          name="episode/[id]" 
+          options={{
+            gestureEnabled: true,
+            animation: 'slide_from_right',
+          }}
+        />
+        
+        {/* 
+          Thread screen - legacy route for Wikipedia articles
+          Kept for backward compatibility
+          [id] is a dynamic segment
           Example: /thread/12345 → id = "12345"
         */}
         <Stack.Screen 
           name="thread/[id]" 
           options={{
-            // Enable the back gesture on iOS
             gestureEnabled: true,
-            // Custom animation for this screen
             animation: 'slide_from_right',
           }}
         />

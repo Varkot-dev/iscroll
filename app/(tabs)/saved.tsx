@@ -1,22 +1,19 @@
 /**
- * SAVED SCREEN - Bookmarked articles
+ * SAVED SCREEN v2.0 - Subscribed Rabbit Holes
  * 
- * Shows all articles the user has saved.
- * Users can:
- * - View saved articles
- * - Tap to read full thread
- * - Remove saved articles
- * - Pull to refresh
+ * Shows all rabbit holes the user is subscribed to with:
+ * - Unread episode counts
+ * - Quick access to continue watching
+ * - Subscription management
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -24,239 +21,230 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useSavedItems } from '@/hooks/useSavedItems';
-import { SavedItem } from '@/lib/supabase';
-import { truncateText } from '@/lib/wikipedia';
+import { useSubscriptions, getTotalUnreadCount } from '@/hooks/useSubscriptions';
+import { CompactFeedCard } from '@/components/FeedCard';
+import { SubscriptionWithDetails, ANONYMOUS_USER_ID } from '@/types';
+import { Colors, Typography, Spacing, BorderRadius } from '@/constants/colors';
 
 export default function SavedScreen() {
-  // ============================================
+  // ==================================================
   // HOOKS
-  // ============================================
+  // ==================================================
   
-  const { savedItems, loading, error, removeItem, refresh } = useSavedItems();
+  const { 
+    getSubscriptionsWithUnread, 
+    unsubscribe,
+    loading: hookLoading,
+    refresh,
+  } = useSubscriptions(ANONYMOUS_USER_ID);
+  
   const router = useRouter();
-
-  // ============================================
-  // HANDLERS
-  // ============================================
   
-  /**
-   * Navigate to thread view
-   */
-  const handleItemPress = useCallback((item: SavedItem) => {
+  // ==================================================
+  // STATE
+  // ==================================================
+  
+  const [subscriptions, setSubscriptions] = useState<SubscriptionWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [totalUnread, setTotalUnread] = useState(0);
+
+  // ==================================================
+  // FETCH DATA
+  // ==================================================
+  
+  const fetchData = useCallback(async () => {
+    try {
+      const subs = await getSubscriptionsWithUnread();
+      setSubscriptions(subs);
+      
+      const unread = await getTotalUnreadCount(ANONYMOUS_USER_ID);
+      setTotalUnread(unread);
+    } catch (error) {
+      console.error('Error fetching subscriptions:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [getSubscriptionsWithUnread]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // ==================================================
+  // HANDLERS
+  // ==================================================
+  
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refresh();
+    await fetchData();
+  }, [refresh, fetchData]);
+
+  const handleItemPress = useCallback((item: SubscriptionWithDetails) => {
     router.push({
-      pathname: '/thread/[id]',
-      params: {
-        id: item.wikipedia_id,
-        title: item.title,
-      },
+      pathname: '/rabbit-hole/[id]',
+      params: { id: item.rabbitHoleId },
     });
   }, [router]);
 
-  /**
-   * Remove item from saved
-   */
-  const handleRemove = useCallback(async (item: SavedItem) => {
-    const success = await removeItem(item.wikipedia_id);
-    if (!success) {
-      console.warn('Failed to remove item');
-    }
-  }, [removeItem]);
+  const handleUnsubscribe = useCallback(async (item: SubscriptionWithDetails) => {
+    await unsubscribe(item.rabbitHoleId);
+    setSubscriptions(prev => prev.filter(s => s.id !== item.id));
+  }, [unsubscribe]);
 
-  /**
-   * Render a saved item
-   */
-  const renderItem = useCallback(({ item }: { item: SavedItem }) => (
-    <TouchableOpacity
-      style={styles.itemCard}
-      onPress={() => handleItemPress(item)}
-      activeOpacity={0.8}
-    >
-      {/* Thumbnail */}
-      {item.thumbnail_url ? (
-        <Image
-          source={{ uri: item.thumbnail_url }}
-          style={styles.thumbnail}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={[styles.thumbnail, styles.placeholderThumbnail]}>
-          <Ionicons name="document-text-outline" size={24} color="#444444" />
-        </View>
-      )}
+  // ==================================================
+  // RENDER ITEM
+  // ==================================================
 
-      {/* Content */}
-      <View style={styles.itemContent}>
-        <Text style={styles.itemTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        {item.extract && (
-          <Text style={styles.itemExtract} numberOfLines={2}>
-            {truncateText(item.extract, 100)}
-          </Text>
-        )}
-        <Text style={styles.savedDate}>
-          Saved {formatDate(item.saved_at)}
-        </Text>
-      </View>
-
-      {/* Remove button */}
+  const renderItem = useCallback(({ item }: { item: SubscriptionWithDetails }) => (
+    <View style={styles.itemContainer}>
+      <CompactFeedCard
+        rabbitHole={item.rabbitHole}
+        onPress={() => handleItemPress(item)}
+        unreadCount={item.unreadCount}
+      />
+      
+      {/* Unsubscribe button */}
       <TouchableOpacity
-        onPress={() => handleRemove(item)}
-        style={styles.removeButton}
+        onPress={() => handleUnsubscribe(item)}
+        style={styles.unsubscribeButton}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Ionicons name="bookmark" size={22} color="#22c55e" />
+        <Ionicons name="notifications" size={20} color={Colors.accent} />
       </TouchableOpacity>
-    </TouchableOpacity>
-  ), [handleItemPress, handleRemove]);
+    </View>
+  ), [handleItemPress, handleUnsubscribe]);
 
-  /**
-   * Key extractor
-   */
-  const keyExtractor = useCallback((item: SavedItem) => item.id, []);
+  const keyExtractor = useCallback((item: SubscriptionWithDetails) => item.id, []);
 
-  // ============================================
+  // ==================================================
   // LOADING STATE
-  // ============================================
+  // ==================================================
   
-  if (loading && savedItems.length === 0) {
+  if (loading && subscriptions.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Saved</Text>
-          <Text style={styles.subtitle}>Your bookmarked articles</Text>
-        </View>
+        <Header totalUnread={0} count={0} />
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#22c55e" />
+          <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={styles.loadingText}>Loading subscriptions...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // ============================================
+  // ==================================================
   // EMPTY STATE
-  // ============================================
+  // ==================================================
   
   const EmptyState = () => (
     <View style={styles.emptyState}>
       <View style={styles.emptyIconContainer}>
-        <Ionicons name="bookmark-outline" size={64} color="#333333" />
+        <Ionicons name="notifications-outline" size={64} color={Colors.textMuted} />
       </View>
-      <Text style={styles.emptyText}>No saved articles yet</Text>
-      <Text style={styles.emptyHint}>
-        Tap the bookmark icon on any article to save it for later
+      <Text style={styles.emptyTitle}>No subscriptions yet</Text>
+      <Text style={styles.emptyText}>
+        Subscribe to rabbit holes to follow their journey and get notified of new episodes
       </Text>
       <TouchableOpacity
         style={styles.browseButton}
         onPress={() => router.push('/')}
       >
-        <Ionicons name="compass-outline" size={20} color="#22c55e" />
-        <Text style={styles.browseButtonText}>Browse articles</Text>
+        <Ionicons name="planet-outline" size={20} color={Colors.accent} />
+        <Text style={styles.browseButtonText}>Explore Rabbit Holes</Text>
       </TouchableOpacity>
     </View>
   );
 
-  // ============================================
+  // ==================================================
   // MAIN RENDER
-  // ============================================
+  // ==================================================
   
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Saved</Text>
-        <Text style={styles.subtitle}>
-          {savedItems.length > 0
-            ? `${savedItems.length} article${savedItems.length !== 1 ? 's' : ''}`
-            : 'Your bookmarked articles'}
-        </Text>
-      </View>
+      <Header totalUnread={totalUnread} count={subscriptions.length} />
 
-      {/* Error message */}
-      {error && (
-        <View style={styles.errorBanner}>
-          <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      {/* List */}
       <FlatList
-        data={savedItems}
+        data={subscriptions}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         contentContainerStyle={[
           styles.listContent,
-          savedItems.length === 0 && styles.emptyListContent,
+          subscriptions.length === 0 && styles.emptyListContent,
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={refresh}
-            tintColor="#22c55e"
-            colors={['#22c55e']}
-            progressBackgroundColor="#141414"
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={Colors.accent}
+            colors={[Colors.accent]}
+            progressBackgroundColor={Colors.background}
           />
         }
         ListEmptyComponent={EmptyState}
+        ListHeaderComponent={
+          subscriptions.length > 0 && totalUnread > 0 ? (
+            <View style={styles.unreadBanner}>
+              <Ionicons name="mail-unread" size={18} color={Colors.warningAmber} />
+              <Text style={styles.unreadBannerText}>
+                {totalUnread} unread episode{totalUnread !== 1 ? 's' : ''} waiting for you
+              </Text>
+            </View>
+          ) : null
+        }
       />
     </SafeAreaView>
   );
 }
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
+// ==================================================
+// HEADER COMPONENT
+// ==================================================
 
-/**
- * Format date for display
- * Shows "Today", "Yesterday", or the date
- */
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return 'today';
-  if (diffDays === 1) return 'yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
+function Header({ totalUnread, count }: { totalUnread: number; count: number }) {
+  return (
+    <View style={styles.header}>
+      <Text style={styles.title}>Following</Text>
+      <Text style={styles.subtitle}>
+        {count > 0
+          ? `${count} rabbit hole${count !== 1 ? 's' : ''}`
+          : 'Your subscribed rabbit holes'}
+      </Text>
+    </View>
+  );
 }
 
-// ============================================
+// ==================================================
 // STYLES
-// ============================================
+// ==================================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: Colors.border,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontSize: Typography['2xl'],
+    fontWeight: Typography.bold,
+    color: Colors.textPrimary,
     marginBottom: 2,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: Typography.sm,
+    color: Colors.textSecondary,
   },
   listContent: {
-    padding: 16,
+    padding: Spacing.lg,
   },
   emptyListContent: {
     flex: 1,
@@ -265,108 +253,85 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: Spacing.xl,
   },
-  errorBanner: {
+  loadingText: {
+    marginTop: Spacing.lg,
+    fontSize: Typography.base,
+    color: Colors.textSecondary,
+  },
+
+  // Unread banner
+  unreadBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    padding: 12,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 8,
+    gap: Spacing.sm,
+    backgroundColor: Colors.warningAmberLight,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
   },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 14,
+  unreadBannerText: {
+    fontSize: Typography.sm,
+    color: Colors.warningAmber,
+    fontWeight: Typography.medium,
   },
-  // Item card styles
-  itemCard: {
-    flexDirection: 'row',
-    backgroundColor: '#141414',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    alignItems: 'center',
+
+  // Item container
+  itemContainer: {
+    position: 'relative',
+    marginBottom: 0,
   },
-  thumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#2a2a2a',
+  unsubscribeButton: {
+    position: 'absolute',
+    right: Spacing.lg,
+    top: '50%',
+    transform: [{ translateY: -10 }],
+    padding: Spacing.sm,
   },
-  placeholderThumbnail: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  itemContent: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 8,
-  },
-  itemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  itemExtract: {
-    fontSize: 13,
-    color: '#888888',
-    lineHeight: 18,
-    marginBottom: 4,
-  },
-  savedDate: {
-    fontSize: 11,
-    color: '#555555',
-  },
-  removeButton: {
-    padding: 8,
-  },
-  // Empty state styles
+
+  // Empty state
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: Spacing['3xl'],
   },
   emptyIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#141414',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: Spacing.xl,
+  },
+  emptyTitle: {
+    fontSize: Typography.lg,
+    fontWeight: Typography.bold,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
   },
   emptyText: {
-    fontSize: 18,
-    color: '#ffffff',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  emptyHint: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: Typography.base,
+    color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
+    lineHeight: Typography.base * Typography.relaxed,
+    marginBottom: Spacing.xl,
   },
   browseButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: '#141414',
-    borderRadius: 24,
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.full,
     borderWidth: 1,
-    borderColor: '#22c55e',
+    borderColor: Colors.accent,
   },
   browseButtonText: {
-    fontSize: 14,
-    color: '#22c55e',
-    fontWeight: '600',
+    fontSize: Typography.base,
+    color: Colors.accent,
+    fontWeight: Typography.semibold,
   },
 });

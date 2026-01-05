@@ -77,7 +77,7 @@ export function ThreadView({ article, onBookmark, isSaved = false }: ThreadViewP
             <Ionicons
               name={isSaved ? 'bookmark' : 'bookmark-outline'}
               size={20}
-              color={isSaved ? '#22c55e' : '#666666'}
+              color={isSaved ? '#1d9bf0' : '#71767b'}
             />
             <Text style={[styles.actionText, isSaved && styles.actionTextActive]}>
               {isSaved ? 'Saved' : 'Save'}
@@ -90,7 +90,7 @@ export function ThreadView({ article, onBookmark, isSaved = false }: ThreadViewP
           onPress={openInWikipedia}
           style={styles.actionButton}
         >
-          <Ionicons name="open-outline" size={20} color="#666666" />
+          <Ionicons name="open-outline" size={20} color="#71767b" />
           <Text style={styles.actionText}>Wikipedia</Text>
         </TouchableOpacity>
       </View>
@@ -107,7 +107,7 @@ export function ThreadView({ article, onBookmark, isSaved = false }: ThreadViewP
       {/* Key facts card (placeholder for future AI-generated content) */}
       <View style={styles.factsCard}>
         <View style={styles.factsHeader}>
-          <Ionicons name="bulb-outline" size={20} color="#22c55e" />
+          <Ionicons name="bulb-outline" size={20} color="#1d9bf0" />
           <Text style={styles.factsTitle}>Quick Facts</Text>
         </View>
         <Text style={styles.factsHint}>
@@ -132,7 +132,7 @@ export function ThreadView({ article, onBookmark, isSaved = false }: ThreadViewP
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#000000',
   },
   content: {
     padding: 20,
@@ -142,18 +142,18 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 12,
     marginBottom: 20,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#16181c',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#e7e9ea',
     lineHeight: 36,
     marginBottom: 8,
   },
   description: {
     fontSize: 16,
-    color: '#888888',
+    color: '#71767b',
     marginBottom: 20,
     fontStyle: 'italic',
   },
@@ -168,26 +168,26 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: 'transparent',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: '#2f3336',
   },
   actionButtonActive: {
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-    borderColor: '#22c55e',
+    backgroundColor: 'rgba(29, 155, 240, 0.1)',
+    borderColor: '#1d9bf0',
   },
   actionText: {
     fontSize: 14,
-    color: '#666666',
+    color: '#71767b',
     fontWeight: '500',
   },
   actionTextActive: {
-    color: '#22c55e',
+    color: '#1d9bf0',
   },
   divider: {
     height: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#2f3336',
     marginVertical: 20,
   },
   contentSection: {
@@ -196,21 +196,21 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#e7e9ea',
     marginBottom: 12,
   },
   articleText: {
     fontSize: 16,
-    color: '#d0d0d0',
+    color: '#e7e9ea',
     lineHeight: 26,
   },
   factsCard: {
-    backgroundColor: '#141414',
+    backgroundColor: 'transparent',
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
-    borderLeftWidth: 3,
-    borderLeftColor: '#22c55e',
+    borderWidth: 1,
+    borderColor: '#2f3336',
   },
   factsHeader: {
     flexDirection: 'row',
@@ -221,11 +221,11 @@ const styles = StyleSheet.create({
   factsTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#22c55e',
+    color: '#1d9bf0',
   },
   factsHint: {
     fontSize: 14,
-    color: '#666666',
+    color: '#71767b',
     fontStyle: 'italic',
   },
   relatedSection: {
@@ -233,6 +233,6 @@ const styles = StyleSheet.create({
   },
   relatedHint: {
     fontSize: 14,
-    color: '#666666',
+    color: '#71767b',
   },
 });

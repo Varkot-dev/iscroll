@@ -1,13 +1,12 @@
 /**
- * FEED SCREEN - Main infinite scroll feed
+ * FEED SCREEN v2.0 - Rabbit Holes Feed
  * 
- * This is the home screen where users scroll through articles.
+ * Main infinite scroll feed showing rabbit holes with:
+ * - Subscription updates
+ * - Discovery recommendations
+ * - Trending content
  * 
- * KEY COMPONENTS:
- * - FlatList: Efficiently renders long lists (only visible items)
- * - FeedCard: Individual article card
- * - useFeed: Custom hook for data fetching
- * - useSavedItems: Custom hook for bookmark management
+ * Uses the new FeedCard component with FOMO-inducing design.
  */
 
 import React, { useCallback } from 'react';
@@ -18,128 +17,123 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useFeed } from '@/hooks/useFeed';
-import { useSavedItems } from '@/hooks/useSavedItems';
 import { FeedCard } from '@/components/FeedCard';
 import { FeedItem } from '@/types';
+import { Colors, Typography, Spacing } from '@/constants/colors';
 
 export default function FeedScreen() {
-  // ============================================
+  // ==================================================
   // HOOKS
-  // ============================================
+  // ==================================================
   
-  // useFeed handles all the data fetching logic
-  const { articles, loading, refreshing, error, refresh, loadMore } = useFeed();
-  
-  // useSavedItems handles bookmark operations
-  const { toggleItem, isItemSaved } = useSavedItems();
-  
-  // Router for navigation
+  const { items, loading, refreshing, error, refresh, loadMore } = useFeed();
   const router = useRouter();
 
-  // ============================================
+  // ==================================================
   // HANDLERS
-  // ============================================
+  // ==================================================
   
-  /**
-   * Navigate to thread view when card is tapped
-   */
   const handleCardPress = useCallback((item: FeedItem) => {
     router.push({
-      pathname: '/thread/[id]',
+      pathname: '/episode/[id]',
       params: { 
-        id: item.id,
-        title: item.title,
+        id: item.episode.id,
+        rabbitHoleId: item.episode.rabbitHoleId,
       },
     });
   }, [router]);
 
-  /**
-   * Handle bookmark button press
-   * Now actually saves/unsaves using Supabase!
-   */
-  const handleBookmark = useCallback(async (item: FeedItem) => {
-    const success = await toggleItem(item);
-    if (!success) {
-      console.warn('Failed to toggle bookmark');
-      // In a production app, you'd show a toast/alert here
-    }
-  }, [toggleItem]);
+  // ==================================================
+  // RENDER ITEM
+  // ==================================================
 
-  /**
-   * Render individual feed item
-   */
   const renderItem = useCallback(({ item }: { item: FeedItem }) => (
     <FeedCard
-      item={item}
+      episode={item.episode}
+      rabbitHoleTitle={item.rabbitHole.title}
+      hookText={item.rabbitHole.hookText}
+      topics={item.rabbitHole.topics}
       onPress={() => handleCardPress(item)}
-      onBookmark={() => handleBookmark(item)}
-      isSaved={isItemSaved(item.id)}
     />
-  ), [handleCardPress, handleBookmark, isItemSaved]);
+  ), [handleCardPress]);
 
-  /**
-   * Get unique key for each item
-   */
   const keyExtractor = useCallback((item: FeedItem) => item.id, []);
 
-  // ============================================
+  // ==================================================
   // LOADING STATE
-  // ============================================
+  // ==================================================
   
-  if (loading && articles.length === 0) {
+  if (loading && items.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>iScroll</Text>
-          <Text style={styles.subtitle}>Learn by scrolling</Text>
-        </View>
+      <Header />
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#22c55e" />
-          <Text style={styles.loadingText}>Loading interesting facts...</Text>
+          <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={styles.loadingText}>Loading rabbit holes...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // ============================================
+  // ==================================================
   // ERROR STATE
-  // ============================================
+  // ==================================================
   
-  if (error && articles.length === 0) {
+  if (error && items.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>iScroll</Text>
-          <Text style={styles.subtitle}>Learn by scrolling</Text>
-        </View>
+      <Header />
         <View style={styles.centered}>
+          <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
           <Text style={styles.errorText}>{error}</Text>
-          <Text style={styles.retryHint}>Pull down to retry</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+            <Text style={styles.retryText}>Try Again</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  // ============================================
+  // ==================================================
+  // EMPTY STATE
+  // ==================================================
+
+  if (items.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header updateCount={0} />
+        <View style={styles.centered}>
+          <Ionicons name="planet-outline" size={64} color={Colors.textMuted} />
+          <Text style={styles.emptyTitle}>No rabbit holes yet</Text>
+          <Text style={styles.emptyText}>
+            Content is being generated. Pull down to refresh!
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+            <Ionicons name="refresh" size={18} color={Colors.accent} />
+            <Text style={styles.retryText}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ==================================================
   // MAIN RENDER
-  // ============================================
+  // ==================================================
   
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>iScroll</Text>
-        <Text style={styles.subtitle}>Learn by scrolling</Text>
-      </View>
-
-      {/* Feed list */}
+      <Header />
+      
       <FlatList
-        data={articles}
+        data={items}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         onEndReached={loadMore}
@@ -148,9 +142,9 @@ export default function FeedScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={refresh}
-            tintColor="#22c55e"
-            colors={['#22c55e']}
-            progressBackgroundColor="#141414"
+            tintColor={Colors.accent}
+            colors={[Colors.accent]}
+            progressBackgroundColor={Colors.background}
           />
         }
         contentContainerStyle={styles.listContent}
@@ -158,15 +152,10 @@ export default function FeedScreen() {
         removeClippedSubviews={true}
         maxToRenderPerBatch={5}
         windowSize={10}
-        ListEmptyComponent={
-          <View style={styles.centered}>
-            <Text style={styles.emptyText}>No articles yet</Text>
-          </View>
-        }
         ListFooterComponent={
-          loading && articles.length > 0 ? (
+          loading && items.length > 0 ? (
             <View style={styles.footer}>
-              <ActivityIndicator size="small" color="#22c55e" />
+              <ActivityIndicator size="small" color={Colors.accent} />
             </View>
           ) : null
         }
@@ -175,62 +164,96 @@ export default function FeedScreen() {
   );
 }
 
-// ============================================
+// ==================================================
+// HEADER COMPONENT
+// ==================================================
+
+function Header() {
+  return (
+    <View style={styles.header}>
+      <Text style={styles.title}>iScroll</Text>
+      <Text style={styles.subtitle}>Discover something interesting</Text>
+    </View>
+  );
+}
+
+// ==================================================
 // STYLES
-// ============================================
+// ==================================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: Colors.border,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 2,
+    fontSize: Typography.xl,
+    fontWeight: Typography.bold,
+    color: Colors.textPrimary,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: Typography.sm,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
   listContent: {
-    paddingVertical: 8,
+    paddingVertical: 0,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: Spacing.xl,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666666',
+    marginTop: Spacing.lg,
+    fontSize: Typography.base,
+    color: Colors.textSecondary,
   },
   errorText: {
-    fontSize: 16,
-    color: '#ef4444',
+    fontSize: Typography.base,
+    color: Colors.error,
     textAlign: 'center',
-    marginBottom: 8,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  retryHint: {
-    fontSize: 14,
-    color: '#666666',
+  emptyTitle: {
+    fontSize: Typography.lg,
+    fontWeight: Typography.bold,
+    color: Colors.textPrimary,
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.sm,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#666666',
+    fontSize: Typography.base,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  retryText: {
+    fontSize: Typography.base,
+    color: Colors.accent,
+    fontWeight: Typography.medium,
   },
   footer: {
-    padding: 20,
+    padding: Spacing.xl,
     alignItems: 'center',
   },
 });

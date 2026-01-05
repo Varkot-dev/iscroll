@@ -1,5 +1,6 @@
 -- ==================================================
 -- iSCROLL DATABASE SCHEMA v2.0 - RABBIT HOLES
+-- COMPLETE RESET VERSION
 -- ==================================================
 -- 
 -- HOW TO USE THIS FILE:
@@ -9,29 +10,40 @@
 -- 4. Copy and paste this entire file
 -- 5. Click "Run" (or press Cmd+Enter / Ctrl+Enter)
 -- 
--- This transforms iScroll from random facts to
--- followable rabbit holes with episodic content!
+-- This will DROP all existing tables and recreate them fresh.
+-- Use this if you're getting column errors from old schema.
+-- ==================================================
+
+-- ==================================================
+-- STEP 1: DROP EXISTING TABLES (in reverse dependency order)
+-- ==================================================
+
+DROP TABLE IF EXISTS user_progress CASCADE;
+DROP TABLE IF EXISTS subscriptions CASCADE;
+DROP TABLE IF EXISTS saved_items CASCADE;
+DROP TABLE IF EXISTS rabbit_hole_topics CASCADE;
+DROP TABLE IF EXISTS episodes CASCADE;
+DROP TABLE IF EXISTS rabbit_holes CASCADE;
+
+-- Drop existing functions (triggers will be dropped automatically when tables are dropped)
+DROP FUNCTION IF EXISTS get_unread_count(TEXT, UUID) CASCADE;
+DROP FUNCTION IF EXISTS update_episode_count() CASCADE;
+
+-- ==================================================
+-- STEP 2: CREATE EXTENSIONS
 -- ==================================================
 
 -- Enable UUID extension (for generating unique IDs)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ==================================================
--- RABBIT_HOLES TABLE
+-- STEP 3: CREATE TABLES
 -- ==================================================
+
+-- RABBIT_HOLES TABLE
 -- Main topics users can follow
 -- Each rabbit hole contains multiple episodes
--- 
--- Types:
--- - "series": Structured course with planned episodes
--- - "live": Ongoing topic with news-triggered updates
--- 
--- Status:
--- - "active": New episodes can be added
--- - "completed": Series is finished
--- - "upcoming": Coming soon (teaser)
-
-CREATE TABLE IF NOT EXISTS rabbit_holes (
+CREATE TABLE rabbit_holes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   
   -- Display title (e.g., "The Race to Nuclear Fusion")
@@ -41,7 +53,6 @@ CREATE TABLE IF NOT EXISTS rabbit_holes (
   description TEXT NOT NULL,
   
   -- FOMO-inducing teaser text shown in feed cards
-  -- e.g., "Scientists just achieved net energy gain for the third time..."
   hook_text TEXT NOT NULL,
   
   -- Type of content: series (planned) or live (news-driven)
@@ -61,18 +72,9 @@ CREATE TABLE IF NOT EXISTS rabbit_holes (
   last_updated TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index for efficient status and type filtering
-CREATE INDEX IF NOT EXISTS idx_rabbit_holes_status ON rabbit_holes(status);
-CREATE INDEX IF NOT EXISTS idx_rabbit_holes_type ON rabbit_holes(type);
-CREATE INDEX IF NOT EXISTS idx_rabbit_holes_last_updated ON rabbit_holes(last_updated DESC);
-
--- ==================================================
 -- EPISODES TABLE
--- ==================================================
 -- Individual content pieces within a rabbit hole
--- Episodes are numbered sequentially and form the "thread"
-
-CREATE TABLE IF NOT EXISTS episodes (
+CREATE TABLE episodes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   
   -- Which rabbit hole this episode belongs to
@@ -81,10 +83,10 @@ CREATE TABLE IF NOT EXISTS episodes (
   -- Episode number (1, 2, 3, etc.)
   episode_number INTEGER NOT NULL,
   
-  -- Episode title (e.g., "Chapter 1: The Beginning")
+  -- Episode title
   title TEXT NOT NULL,
   
-  -- Main AI-generated narrative content (300-500 words)
+  -- Main AI-generated narrative content
   content TEXT NOT NULL,
   
   -- Content format type
@@ -106,17 +108,9 @@ CREATE TABLE IF NOT EXISTS episodes (
   UNIQUE(rabbit_hole_id, episode_number)
 );
 
--- Index for efficient episode lookup
-CREATE INDEX IF NOT EXISTS idx_episodes_rabbit_hole ON episodes(rabbit_hole_id);
-CREATE INDEX IF NOT EXISTS idx_episodes_published ON episodes(published_at DESC);
-
--- ==================================================
 -- RABBIT_HOLE_TOPICS TABLE
--- ==================================================
 -- Tags for categorization and discovery algorithm
--- Many-to-many relationship: rabbit holes can have multiple topics
-
-CREATE TABLE IF NOT EXISTS rabbit_hole_topics (
+CREATE TABLE rabbit_hole_topics (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   
   rabbit_hole_id UUID NOT NULL REFERENCES rabbit_holes(id) ON DELETE CASCADE,
@@ -128,17 +122,9 @@ CREATE TABLE IF NOT EXISTS rabbit_hole_topics (
   UNIQUE(rabbit_hole_id, topic)
 );
 
--- Index for topic-based discovery
-CREATE INDEX IF NOT EXISTS idx_topics_topic ON rabbit_hole_topics(topic);
-CREATE INDEX IF NOT EXISTS idx_topics_rabbit_hole ON rabbit_hole_topics(rabbit_hole_id);
-
--- ==================================================
 -- SUBSCRIPTIONS TABLE
--- ==================================================
 -- Tracks what users follow and their progress
--- Core of the FOMO engagement system
-
-CREATE TABLE IF NOT EXISTS subscriptions (
+CREATE TABLE subscriptions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   
   -- User identifier (anonymous ID for now, will be auth.uid() later)
@@ -160,17 +146,9 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   UNIQUE(user_id, rabbit_hole_id)
 );
 
--- Index for efficient subscription lookup
-CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
-CREATE INDEX IF NOT EXISTS idx_subscriptions_rabbit_hole ON subscriptions(rabbit_hole_id);
-
--- ==================================================
 -- USER_PROGRESS TABLE
--- ==================================================
 -- Tracks which episodes users have read/completed
--- Enables "continue watching" and progress indicators
-
-CREATE TABLE IF NOT EXISTS user_progress (
+CREATE TABLE user_progress (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   
   -- User identifier
@@ -189,17 +167,9 @@ CREATE TABLE IF NOT EXISTS user_progress (
   UNIQUE(user_id, episode_id)
 );
 
--- Index for efficient progress lookup
-CREATE INDEX IF NOT EXISTS idx_progress_user ON user_progress(user_id);
-CREATE INDEX IF NOT EXISTS idx_progress_episode ON user_progress(episode_id);
-
--- ==================================================
--- SAVED_ITEMS TABLE (UPDATED)
--- ==================================================
--- Now saves episodes instead of Wikipedia articles
--- Backward compatible with old schema
-
-CREATE TABLE IF NOT EXISTS saved_items (
+-- SAVED_ITEMS TABLE
+-- Saves episodes and rabbit holes
+CREATE TABLE saved_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   
   -- User identifier
@@ -214,7 +184,7 @@ CREATE TABLE IF NOT EXISTS saved_items (
   -- New: Rabbit hole ID (for quick rabbit hole saves)
   rabbit_hole_id UUID REFERENCES rabbit_holes(id) ON DELETE CASCADE,
   
-  -- Display info (still useful for quick display)
+  -- Display info
   title TEXT NOT NULL,
   extract TEXT,
   thumbnail_url TEXT,
@@ -223,15 +193,39 @@ CREATE TABLE IF NOT EXISTS saved_items (
   saved_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index for efficient saved items lookup
-CREATE INDEX IF NOT EXISTS idx_saved_items_user ON saved_items(user_id);
-CREATE INDEX IF NOT EXISTS idx_saved_items_wikipedia_id ON saved_items(wikipedia_id);
-CREATE INDEX IF NOT EXISTS idx_saved_items_episode ON saved_items(episode_id);
+-- ==================================================
+-- STEP 4: CREATE INDEXES
+-- ==================================================
+
+-- Rabbit holes indexes
+CREATE INDEX idx_rabbit_holes_status ON rabbit_holes(status);
+CREATE INDEX idx_rabbit_holes_type ON rabbit_holes(type);
+CREATE INDEX idx_rabbit_holes_last_updated ON rabbit_holes(last_updated DESC);
+
+-- Episodes indexes
+CREATE INDEX idx_episodes_rabbit_hole ON episodes(rabbit_hole_id);
+CREATE INDEX idx_episodes_published ON episodes(published_at DESC);
+
+-- Topics indexes
+CREATE INDEX idx_topics_topic ON rabbit_hole_topics(topic);
+CREATE INDEX idx_topics_rabbit_hole ON rabbit_hole_topics(rabbit_hole_id);
+
+-- Subscriptions indexes
+CREATE INDEX idx_subscriptions_user ON subscriptions(user_id);
+CREATE INDEX idx_subscriptions_rabbit_hole ON subscriptions(rabbit_hole_id);
+
+-- User progress indexes
+CREATE INDEX idx_progress_user ON user_progress(user_id);
+CREATE INDEX idx_progress_episode ON user_progress(episode_id);
+
+-- Saved items indexes
+CREATE INDEX idx_saved_items_user ON saved_items(user_id);
+CREATE INDEX idx_saved_items_wikipedia_id ON saved_items(wikipedia_id);
+CREATE INDEX idx_saved_items_episode ON saved_items(episode_id);
 
 -- ==================================================
--- ROW LEVEL SECURITY (RLS)
+-- STEP 5: ROW LEVEL SECURITY (RLS)
 -- ==================================================
--- Public access for MVP, will add user-specific policies later
 
 -- Enable RLS on all tables
 ALTER TABLE rabbit_holes ENABLE ROW LEVEL SECURITY;
@@ -240,6 +234,26 @@ ALTER TABLE rabbit_hole_topics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE saved_items ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Allow public read rabbit_holes" ON rabbit_holes;
+DROP POLICY IF EXISTS "Allow public insert rabbit_holes" ON rabbit_holes;
+DROP POLICY IF EXISTS "Allow public update rabbit_holes" ON rabbit_holes;
+DROP POLICY IF EXISTS "Allow public read episodes" ON episodes;
+DROP POLICY IF EXISTS "Allow public insert episodes" ON episodes;
+DROP POLICY IF EXISTS "Allow public update episodes" ON episodes;
+DROP POLICY IF EXISTS "Allow public read topics" ON rabbit_hole_topics;
+DROP POLICY IF EXISTS "Allow public insert topics" ON rabbit_hole_topics;
+DROP POLICY IF EXISTS "Allow public read subscriptions" ON subscriptions;
+DROP POLICY IF EXISTS "Allow public insert subscriptions" ON subscriptions;
+DROP POLICY IF EXISTS "Allow public delete subscriptions" ON subscriptions;
+DROP POLICY IF EXISTS "Allow public update subscriptions" ON subscriptions;
+DROP POLICY IF EXISTS "Allow public read progress" ON user_progress;
+DROP POLICY IF EXISTS "Allow public insert progress" ON user_progress;
+DROP POLICY IF EXISTS "Allow public update progress" ON user_progress;
+DROP POLICY IF EXISTS "Allow public read saved_items" ON saved_items;
+DROP POLICY IF EXISTS "Allow public insert saved_items" ON saved_items;
+DROP POLICY IF EXISTS "Allow public delete saved_items" ON saved_items;
 
 -- Rabbit Holes: Public read, admin write
 CREATE POLICY "Allow public read rabbit_holes" ON rabbit_holes 
@@ -263,7 +277,7 @@ CREATE POLICY "Allow public read topics" ON rabbit_hole_topics
 CREATE POLICY "Allow public insert topics" ON rabbit_hole_topics 
   FOR INSERT WITH CHECK (true);
 
--- Subscriptions: Public all (will restrict to user later)
+-- Subscriptions: Public all
 CREATE POLICY "Allow public read subscriptions" ON subscriptions 
   FOR SELECT USING (true);
 CREATE POLICY "Allow public insert subscriptions" ON subscriptions 
@@ -273,7 +287,7 @@ CREATE POLICY "Allow public delete subscriptions" ON subscriptions
 CREATE POLICY "Allow public update subscriptions" ON subscriptions 
   FOR UPDATE USING (true);
 
--- User Progress: Public all (will restrict to user later)
+-- User Progress: Public all
 CREATE POLICY "Allow public read progress" ON user_progress 
   FOR SELECT USING (true);
 CREATE POLICY "Allow public insert progress" ON user_progress 
@@ -281,7 +295,7 @@ CREATE POLICY "Allow public insert progress" ON user_progress
 CREATE POLICY "Allow public update progress" ON user_progress 
   FOR UPDATE USING (true);
 
--- Saved Items: Public all (will restrict to user later)
+-- Saved Items: Public all
 CREATE POLICY "Allow public read saved_items" ON saved_items 
   FOR SELECT USING (true);
 CREATE POLICY "Allow public insert saved_items" ON saved_items 
@@ -290,7 +304,7 @@ CREATE POLICY "Allow public delete saved_items" ON saved_items
   FOR DELETE USING (true);
 
 -- ==================================================
--- HELPER FUNCTIONS
+-- STEP 6: HELPER FUNCTIONS
 -- ==================================================
 
 -- Function to get unread episode count for a user's subscription
@@ -338,7 +352,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger for automatic episode count updates
-DROP TRIGGER IF EXISTS episode_count_trigger ON episodes;
 CREATE TRIGGER episode_count_trigger
   AFTER INSERT OR DELETE ON episodes
   FOR EACH ROW
@@ -349,15 +362,7 @@ CREATE TRIGGER episode_count_trigger
 -- ==================================================
 -- Your rabbit hole system is now ready!
 -- 
--- Key tables:
--- - rabbit_holes: Topics users can follow
--- - episodes: Content pieces within each rabbit hole
--- - rabbit_hole_topics: Tags for discovery
--- - subscriptions: Track what users follow
--- - user_progress: Track reading progress
--- - saved_items: Bookmarked content (updated)
---
 -- Next steps:
--- 1. Run the seed data script to create initial content
--- 2. Update the app to use new API endpoints
+-- 1. Run: npm run seed (to populate with sample data)
+-- 2. Refresh your app
 -- ==================================================

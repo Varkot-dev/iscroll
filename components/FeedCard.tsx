@@ -1,185 +1,321 @@
 /**
- * FEED CARD COMPONENT
+ * FEED CARD COMPONENT v2.0
  * 
- * Displays a single article in the scrolling feed.
- * Users tap to view the full thread.
+ * Displays a rabbit hole in the scrolling feed.
+ * Now supports:
+ * - NEW/LIVE/SERIES badges
+ * - Subscribe button
+ * - Unread episode counts
+ * - FOMO-inducing hook text
  * 
- * PROPS (data passed from parent):
- * - item: The article data (FeedItem type)
+ * PROPS:
+ * - rabbitHole: The rabbit hole data
  * - onPress: Function called when card is tapped
- * - onBookmark: Function called when bookmark button is tapped
- * 
- * KEY CONCEPTS:
- * - TouchableOpacity: Button that fades when pressed
- * - Props: Data passed from parent component
- * - Conditional rendering: {condition && <Component />}
+ * - onSubscribe: Function called when subscribe is tapped
+ * - isSubscribed: Whether user follows this rabbit hole
+ * - unreadCount: Number of unread episodes
  */
 
 import React from 'react';
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { FeedItem } from '@/types';
-import { truncateText } from '@/lib/wikipedia';
+import { Episode, FeedItem as LegacyFeedItem } from '@/types';
+import { Colors, Typography, Spacing, BorderRadius } from '@/constants/colors';
 
-// Get screen width for responsive sizing
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// ============================================
-// PROPS TYPE DEFINITION
-// ============================================
-// Define what data this component expects to receive
+// ==================================================
+// TYPES
+// ==================================================
 
 type FeedCardProps = {
-  item: FeedItem;
+  episode: Episode;
+  rabbitHoleTitle: string;
+  hookText?: string;
+  topics?: string[];
+  onPress: () => void;
+};
+
+// Legacy props for backward compatibility
+type LegacyFeedCardProps = {
+  item: LegacyFeedItem;
   onPress: () => void;
   onBookmark?: () => void;
   isSaved?: boolean;
 };
 
-// ============================================
-// COMPONENT
-// ============================================
+// ==================================================
+// MAIN COMPONENT
+// ==================================================
 
-export function FeedCard({ item, onPress, onBookmark, isSaved = false }: FeedCardProps) {
+export function FeedCard({ 
+  episode,
+  rabbitHoleTitle,
+  hookText,
+  topics = [],
+  onPress,
+}: FeedCardProps) {
+  const rawSnippet = hookText || episode.summary || episode.content;
+  const snippet = rawSnippet.length > 260 ? `${rawSnippet.slice(0, 257)}...` : rawSnippet;
+
   return (
-    // TouchableOpacity makes the whole card tappable
-    // activeOpacity controls how faded it gets when pressed (0-1)
     <TouchableOpacity
       style={styles.card}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.9}
     >
-      {/* Card content container */}
-      <View style={styles.content}>
-        {/* Text section */}
-        <View style={styles.textContainer}>
-          {/* Title */}
-          <Text style={styles.title} numberOfLines={2}>
-            {item.title}
-          </Text>
-          
-          {/* Extract (summary) - truncated to fit */}
-          <Text style={styles.extract} numberOfLines={4}>
-            {truncateText(item.extract, 150)}
-          </Text>
-          
-          {/* Footer with action button */}
-          <View style={styles.footer}>
-            <Text style={styles.tapHint}>Tap to read more</Text>
-            
-            {/* Bookmark button */}
-            {onBookmark && (
-              <TouchableOpacity
-                onPress={(e) => {
-                  // Stop the tap from also triggering card press
-                  e.stopPropagation();
-                  onBookmark();
-                }}
-                style={styles.bookmarkButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                  size={22}
-                  color={isSaved ? '#22c55e' : '#666666'}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
+      <Text style={styles.context} numberOfLines={1}>
+        {rabbitHoleTitle} · Chapter {episode.episodeNumber}
+      </Text>
+
+      <Text style={styles.title} numberOfLines={2}>
+        {episode.title}
+      </Text>
+
+      <Text style={styles.snippet} numberOfLines={4}>
+        {snippet}
+      </Text>
+
+      {topics.length > 0 && (
+        <View style={styles.topics}>
+          {topics.slice(0, 3).map((topic, index) => (
+            <Text key={index} style={styles.topicTag}>
+              #{topic}
+            </Text>
+          ))}
         </View>
-        
-        {/* Thumbnail image (if available) */}
-        {item.thumbnailUrl && (
-          <Image
-            source={{ uri: item.thumbnailUrl }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
-        )}
-      </View>
-      
-      {/* Subtle gradient overlay at bottom for depth */}
-      <View style={styles.bottomGradient} />
+      )}
     </TouchableOpacity>
   );
 }
 
-// ============================================
+// ==================================================
+// LEGACY FEED CARD (for backward compatibility)
+// ==================================================
+
+export function LegacyFeedCard({ item, onPress, onBookmark, isSaved = false }: LegacyFeedCardProps) {
+  return (
+    <TouchableOpacity
+      style={styles.legacyCard}
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
+      <Text style={styles.legacyContent}>
+        {createHook(item.title, item.extract)}
+      </Text>
+      
+      {onBookmark && (
+        <TouchableOpacity
+          onPress={(e) => {
+            e.stopPropagation();
+            onBookmark();
+          }}
+          style={styles.legacyBookmarkButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons
+            name={isSaved ? 'bookmark' : 'bookmark-outline'}
+            size={20}
+            color={isSaved ? Colors.accent : Colors.textSecondary}
+          />
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// Legacy hook generator
+function createHook(title: string, extract: string): string {
+  const sentences = extract.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    if (trimmed.length < 40 || trimmed.length > 200) continue;
+    
+    const lower = trimmed.toLowerCase();
+    const interestingPatterns = [
+      /first|largest|smallest|oldest|newest|biggest/,
+      /million|billion|thousand|hundreds/,
+      /discover|invent|create|found/,
+      /only|never|always|unique/,
+      /famous|known for|renowned/,
+      /war|battle|revolution/,
+      /secret|mysterious|unknown/,
+      /record|achievement|breakthrough/,
+    ];
+    
+    if (interestingPatterns.some(pattern => pattern.test(lower))) {
+      return trimmed + '.';
+    }
+  }
+  
+  const firstSentence = sentences[0]?.trim();
+  if (firstSentence && firstSentence.length >= 40 && firstSentence.length <= 180) {
+    return firstSentence + '.';
+  }
+  
+  return extract.length > 160 ? extract.slice(0, 157) + '...' : extract;
+}
+
+// ==================================================
+// COMPACT FEED CARD (for subscription list)
+// ==================================================
+
+type CompactFeedCardProps = {
+  rabbitHole: RabbitHole;
+  onPress: () => void;
+  unreadCount?: number;
+};
+
+export function CompactFeedCard({ rabbitHole, onPress, unreadCount = 0 }: CompactFeedCardProps) {
+  return (
+    <TouchableOpacity
+      style={styles.compactCard}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      {/* Thumbnail or placeholder */}
+      {rabbitHole.thumbnailUrl ? (
+        <Image
+          source={{ uri: rabbitHole.thumbnailUrl }}
+          style={styles.compactThumbnail}
+        />
+      ) : (
+        <View style={[styles.compactThumbnail, styles.compactPlaceholder]}>
+          <Ionicons 
+            name={rabbitHole.type === 'live' ? 'radio' : 'book'} 
+            size={24} 
+            color={Colors.textMuted} 
+          />
+        </View>
+      )}
+
+      {/* Content */}
+      <View style={styles.compactContent}>
+        <View style={styles.compactHeader}>
+          <Text style={styles.compactTitle} numberOfLines={1}>
+            {rabbitHole.title}
+          </Text>
+          {unreadCount > 0 && (
+            <UnreadBadge count={unreadCount} />
+          )}
+        </View>
+        <Text style={styles.compactSubtitle} numberOfLines={1}>
+          {rabbitHole.totalEpisodes} episodes • {rabbitHole.type}
+        </Text>
+      </View>
+
+      {/* Arrow */}
+      <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+    </TouchableOpacity>
+  );
+}
+
+// ==================================================
 // STYLES
-// ============================================
+// ==================================================
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#141414',
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    overflow: 'hidden', // Clips content to rounded corners
-    
-    // Shadow for iOS
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    
-    // Shadow for Android
-    elevation: 4,
+    backgroundColor: Colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg,
   },
-  content: {
-    flexDirection: 'row', // Arrange children horizontally
-    padding: 16,
-  },
-  textContainer: {
-    flex: 1, // Take up remaining space
-    marginRight: 12,
+  context: {
+    fontSize: Typography.sm,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
-    lineHeight: 24,
+    fontSize: Typography.lg,
+    fontWeight: Typography.bold,
+    color: Colors.textPrimary,
+    lineHeight: Typography.lg * Typography.tight,
+    marginBottom: Spacing.xs,
   },
-  extract: {
-    fontSize: 14,
-    color: '#a0a0a0',
-    lineHeight: 20,
-    marginBottom: 12,
+  snippet: {
+    fontSize: Typography.base,
+    color: Colors.textPrimary,
+    lineHeight: Typography.base * Typography.relaxed,
+    marginBottom: Spacing.sm,
   },
-  footer: {
+  topics: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  topicTag: {
+    fontSize: Typography.sm,
+    color: Colors.accent,
+  },
+
+  // Legacy card (kept for backward compatibility)
+  legacyCard: {
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg,
+  },
+  legacyContent: {
+    fontSize: Typography.base,
+    color: Colors.textPrimary,
+    lineHeight: Typography.base * Typography.normal,
+    fontWeight: Typography.normal,
+    marginBottom: Spacing.md,
+  },
+  legacyBookmarkButton: {
+    position: 'absolute',
+    top: Spacing.lg,
+    right: Spacing.lg,
+    padding: Spacing.xs,
+  },
+
+  // Compact card (used in subscription lists)
+  compactCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  compactThumbnail: {
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.border,
+  },
+  compactPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  compactContent: {
+    flex: 1,
+    marginLeft: Spacing.md,
+    marginRight: Spacing.sm,
+  },
+  compactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 'auto', // Push to bottom
+    gap: Spacing.sm,
   },
-  tapHint: {
-    fontSize: 12,
-    color: '#22c55e',
-    fontWeight: '600',
+  compactTitle: {
+    flex: 1,
+    fontSize: Typography.base,
+    fontWeight: Typography.semibold,
+    color: Colors.textPrimary,
   },
-  bookmarkButton: {
-    padding: 4,
-  },
-  thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#2a2a2a', // Placeholder color while loading
-  },
-  bottomGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: '#22c55e',
-    opacity: 0.3,
+  compactSubtitle: {
+    fontSize: Typography.sm,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
   },
 });

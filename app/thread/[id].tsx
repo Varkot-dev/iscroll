@@ -113,7 +113,7 @@ export default function ThreadScreen() {
         style={styles.headerButton}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        <Ionicons name="arrow-back" size={24} color="#e7e9ea" />
       </TouchableOpacity>
 
       {/* Title */}
@@ -130,7 +130,7 @@ export default function ThreadScreen() {
         <Ionicons
           name={isSaved ? 'bookmark' : 'bookmark-outline'}
           size={24}
-          color={isSaved ? '#22c55e' : '#ffffff'}
+          color={isSaved ? '#1d9bf0' : '#e7e9ea'}
         />
       </TouchableOpacity>
     </View>
@@ -145,7 +145,7 @@ export default function ThreadScreen() {
       <SafeAreaView style={styles.container}>
         <Header />
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#22c55e" />
+          <ActivityIndicator size="large" color="#1d9bf0" />
           <Text style={styles.loadingText}>Loading article...</Text>
         </View>
       </SafeAreaView>
@@ -194,7 +194,7 @@ export default function ThreadScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#000000',
   },
   header: {
     flexDirection: 'row',
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: '#2f3336',
   },
   headerButton: {
     padding: 8,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#e7e9ea',
     textAlign: 'center',
     marginHorizontal: 8,
   },
@@ -227,12 +227,12 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666666',
+    color: '#71767b',
   },
   errorText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#ef4444',
+    color: '#f4212e',
     textAlign: 'center',
   },
   backLink: {
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   },
   backLinkText: {
     fontSize: 16,
-    color: '#22c55e',
+    color: '#1d9bf0',
     fontWeight: '500',
   },
 });
