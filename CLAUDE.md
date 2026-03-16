@@ -17,17 +17,21 @@ iScroll is a TikTok-style full-screen snap-scroll learning feed. Each card is a 
 ### What's built
 - Full-screen snap-scroll feed (`app/(tabs)/index.tsx`) using `FlatList` with `pagingEnabled`
 - `LearnCard` component — title, content, wow fact callout, chain button, bookmark
-- `usePostFeed` hook — cursor-based pagination, `appendItemAt` for mid-feed injection
+- `usePostFeed` hook — cursor-based pagination, `appendItemAt` for mid-feed injection, loadingMoreRef mutex
 - Chain mechanic — tap a link to inject the next related card directly after current position
 - Save/unsave posts — persisted to Supabase `saved_posts` table
 - Saved tab — display-only list of bookmarked posts
-- Supabase schema — `posts`, `post_topics`, `saved_posts` tables + chain columns
+- Supabase schema — `posts`, `post_topics`, `saved_posts`, `engagement_events` tables + chain columns
+- `topic_engagement_scores` view — pre-aggregated topic scores for adaptive depth algorithm
+- `lib/engagement.ts` — trackView, trackChainTap, trackSave, trackUnsave (non-critical, never throws)
+- `getPostsByTopic` in `lib/posts.ts` — cursor-paginated topic-filtered post fetching
 - Seed script — 50 learn cards across 12 topic chains
+- CLAUDE.md + PRIMER.md — session onboarding and engineering log
 
 ### What's NOT done yet
 - UI polish on LearnCard (currently functional but visually rough)
-- Deleted old files (episode/rabbit-hole era) staged but not committed
-- Adaptive depth (track engagement, serve deeper content)
+- Wire engagement tracking into the UI (lib/engagement.ts exists but isn't called yet)
+- Adaptive depth feed algorithm (data layer ready, feed logic not built)
 - PDF ingestion
 - Animations
 
@@ -63,6 +67,10 @@ Supabase → lib/posts.ts → usePostFeed → index.tsx → LearnCard
 - `posts` — id, title, content, summary, wow_fact, related_post_id, related_post_title, published_at
 - `post_topics` — post_id, topic (separate table — a post can have many topics)
 - `saved_posts` — user_id, post_id, saved_at
+- `engagement_events` — user_id, post_id, event_type, duration_ms, created_at
+
+### Database views
+- `topic_engagement_scores` — aggregated per user per topic: score (weighted), event_count, last_engaged_at
 
 ---
 
@@ -79,6 +87,9 @@ Supabase → lib/posts.ts → usePostFeed → index.tsx → LearnCard
 - **Don't run migrations before the base schema exists.** The `migration-add-chain-fields.sql` failed with "relation posts does not exist" because `schema-posts.sql` had never been run on the Supabase project. Always confirm base tables exist before running migrations. In future: add a comment at the top of migration files stating which schema version they depend on.
 - **Stage deletions explicitly.** When committing a refactor that deletes many files, verify `git status` shows deletions are staged before committing. In this session, old episode/rabbit-hole files were deleted locally but not staged — they persisted as unstaged deletions across the commit.
 - **Pre-existing TS errors should be fixed immediately.** Found two pre-existing TypeScript errors (`Typography.normal` duplicate key, `Badge.tsx` never type) that were unrelated to our changes but still needed fixing before `tsc --noEmit` passed. Don't leave broken types in the codebase even if you didn't introduce them.
+- **Non-critical operations must never throw.** `lib/engagement.ts` catches all errors and logs warnings instead. A failed analytics write should never crash the user experience. Pattern: wrap in try/catch, console.warn, return gracefully.
+- **Use refs not state for mutexes.** `loadingMoreRef` in `usePostFeed` prevents stacked fetches from rapid scrolling. A `useRef` is the right tool here because changing it shouldn't trigger a re-render — it's an internal implementation detail, not UI state.
+- **Build the data layer before the UI layer.** Engagement tracking infrastructure (table, view, lib functions) was built before any UI wires into it. When UI work starts, the plumbing is already there. Don't design UI and data simultaneously.
 
 ---
 
