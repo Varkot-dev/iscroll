@@ -133,6 +133,29 @@ export type TopicInfo = {
 };
 
 // ==================================================
+// ENGAGEMENT TYPES
+// ==================================================
+
+/**
+ * The types of things a user can do that signal interest in a topic.
+ * Used to drive adaptive depth — more engagement = deeper content served.
+ *
+ * - 'view'       : card was visible on screen (logged with duration_ms)
+ * - 'chain_tap'  : user tapped the chain button (strongest signal — active curiosity)
+ * - 'save'       : user bookmarked the card
+ * - 'unsave'     : user removed bookmark (weak negative signal)
+ */
+export type EngagementEventType = 'view' | 'chain_tap' | 'save' | 'unsave';
+
+export type EngagementEvent = {
+  userId: string;
+  postId: string;
+  eventType: EngagementEventType;
+  durationMs?: number;   // only for 'view' events — how long card was visible
+  topics: string[];      // denormalized from the post — lets us aggregate by topic without joins
+};
+
+// ==================================================
 // UTILITY TYPES
 // ==================================================
 

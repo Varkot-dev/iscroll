@@ -5,7 +5,7 @@
  * duplicates/skips when new content is inserted during a session.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FeedItem, Post } from '@/types';
 
@@ -81,6 +81,9 @@ export function usePostFeed() {
     hasMore: true,
   });
   const [cursor, setCursor] = useState<Cursor>(null);
+  // Ref (not state) so it doesn't trigger re-renders — just a mutex
+  // to prevent multiple loadMore calls firing simultaneously
+  const loadingMoreRef = useRef(false);
 
   const fetchBatch = useCallback(async (afterCursor: Cursor): Promise<{ items: FeedItem[]; nextCursor: Cursor }> => {
     let query = supabase
@@ -163,7 +166,9 @@ export function usePostFeed() {
 
   const loadMore = useCallback(async () => {
     if (state.loading || state.refreshing || !state.hasMore || !cursor) return;
+    if (loadingMoreRef.current) return; // prevent stacked fetches from rapid scrolling
 
+    loadingMoreRef.current = true;
     try {
       const { items: moreItems, nextCursor } = await fetchBatch(cursor);
       setCursor(nextCursor);
@@ -174,6 +179,8 @@ export function usePostFeed() {
       }));
     } catch (error) {
       console.error('Error loading more:', error);
+    } finally {
+      loadingMoreRef.current = false;
     }
   }, [state.loading, state.refreshing, state.hasMore, cursor, fetchBatch]);
 

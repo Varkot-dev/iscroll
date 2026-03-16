@@ -217,6 +217,74 @@ export async function createPost(post: {
 }
 
 // ==================================================
+// GET POSTS BY TOPIC
+// ==================================================
+
+/**
+ * Get posts for a specific topic, cursor-paginated.
+ * Used by adaptive depth — when a user shows strong interest in a topic,
+ * the feed can pull more cards from that topic specifically.
+ */
+export async function getPostsByTopic(
+  topic: string,
+  options: { limit?: number; afterCursor?: { publishedAt: string; id: string } } = {}
+): Promise<{ data: Post[]; error: string | null }> {
+  try {
+    // First get post IDs for this topic
+    const { data: topicRows, error: topicError } = await supabase
+      .from('post_topics')
+      .select('post_id')
+      .eq('topic', topic);
+
+    if (topicError) throw topicError;
+    if (!topicRows || topicRows.length === 0) return { data: [], error: null };
+
+    const postIds = topicRows.map((r: { post_id: string }) => r.post_id);
+
+    let query = supabase
+      .from('posts')
+      .select('*')
+      .in('id', postIds)
+      .order('published_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(options.limit || 15);
+
+    if (options.afterCursor) {
+      query = query.or(
+        `published_at.lt.${options.afterCursor.publishedAt},and(published_at.eq.${options.afterCursor.publishedAt},id.lt.${options.afterCursor.id})`
+      );
+    }
+
+    const { data: rows, error } = await query;
+    if (error) throw error;
+
+    const ids = (rows || []).map((r: PostRow) => r.id);
+    const { data: allTopicRows } = await supabase
+      .from('post_topics')
+      .select('post_id, topic')
+      .in('post_id', ids);
+
+    const topicMap = new Map<string, string[]>();
+    (allTopicRows || []).forEach((t: { post_id: string; topic: string }) => {
+      const existing = topicMap.get(t.post_id) || [];
+      topicMap.set(t.post_id, [...existing, t.topic]);
+    });
+
+    const posts = (rows || []).map((row: PostRow) =>
+      transformPost(row, topicMap.get(row.id) || [])
+    );
+
+    return { data: posts, error: null };
+  } catch (error) {
+    console.error('Error fetching posts by topic:', error);
+    return {
+      data: [],
+      error: error instanceof Error ? error.message : 'Failed to fetch posts by topic',
+    };
+  }
+}
+
+// ==================================================
 // SAVED POSTS
 // ==================================================
 
