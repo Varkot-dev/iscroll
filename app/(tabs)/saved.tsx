@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { getSavedPosts, unsavePost } from '@/lib/posts';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { StarField } from '@/components/StarField';
 import { Post, ANONYMOUS_USER_ID } from '@/types';
 import { Colors, Typography, Spacing } from '@/constants/colors';
 
@@ -68,55 +69,64 @@ function SavedScreen() {
 
   if (loading && posts.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Header count={0} />
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={Colors.accent} />
-          <Text style={styles.loadingText}>Loading saved posts...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.root}>
+        <StarField />
+        <SafeAreaView style={styles.container}>
+          <Header count={0} />
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={Colors.accent} />
+            <Text style={styles.loadingText}>Loading saved posts...</Text>
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
   if (error && posts.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Header count={0} />
-        <View style={styles.centered}>
-          <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-            <Text style={styles.retryText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <View style={styles.root}>
+        <StarField />
+        <SafeAreaView style={styles.container}>
+          <Header count={0} />
+          <View style={styles.centered}>
+            <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+              <Text style={styles.retryText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header count={posts.length} />
-      <FlatList
-        data={posts}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        contentContainerStyle={[
-          styles.listContent,
-          posts.length === 0 && styles.emptyListContent,
-        ]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={Colors.accent}
-            colors={[Colors.accent]}
-            progressBackgroundColor={Colors.background}
-          />
-        }
-        ListEmptyComponent={<EmptyState />}
-      />
-    </SafeAreaView>
+    <View style={styles.root}>
+      <StarField />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <Header count={posts.length} />
+        <FlatList
+          data={posts}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={[
+            styles.listContent,
+            posts.length === 0 && styles.emptyListContent,
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={Colors.accent}
+              colors={[Colors.accent]}
+              progressBackgroundColor={Colors.background}
+            />
+          }
+          ListEmptyComponent={<EmptyState />}
+        />
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -169,9 +179,13 @@ function EmptyState() {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#0a0a0f',
+  },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: 'transparent',
   },
   header: {
     paddingHorizontal: Spacing.xl,

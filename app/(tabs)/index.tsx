@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { usePostFeed } from '@/hooks/usePostFeed';
 import { LearnCard } from '@/components/LearnCard';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { StarField } from '@/components/StarField';
 import { FeedItem, ANONYMOUS_USER_ID } from '@/types';
 import { Colors, Typography, Spacing } from '@/constants/colors';
 import { getSavedPosts, getPostById, savePost, unsavePost } from '@/lib/posts';
@@ -90,6 +91,7 @@ function FeedScreen() {
   if (loading && items.length === 0) {
     return (
       <View style={styles.centered}>
+        <StarField />
         <ActivityIndicator size="large" color={Colors.accent} />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
@@ -99,6 +101,7 @@ function FeedScreen() {
   if (error && items.length === 0) {
     return (
       <View style={styles.centered}>
+        <StarField />
         <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={refresh}>
@@ -111,6 +114,7 @@ function FeedScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.centered}>
+        <StarField />
         <Ionicons name="planet-outline" size={64} color={Colors.textMuted} />
         <Text style={styles.emptyTitle}>No posts yet</Text>
         <Text style={styles.emptyText}>Content is being generated. Pull down to refresh!</Text>
@@ -124,6 +128,7 @@ function FeedScreen() {
 
   return (
     <View style={styles.container}>
+      <StarField />
       <FlatList
         ref={flatListRef}
         data={items}
@@ -134,6 +139,7 @@ function FeedScreen() {
         snapToAlignment="start"
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
+        style={{ backgroundColor: 'transparent' }}
         getItemLayout={(_, index) => ({
           length: SCREEN_HEIGHT,
           offset: SCREEN_HEIGHT * index,
@@ -158,13 +164,13 @@ function FeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#0a0a0f',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: '#0a0a0f',
     padding: Spacing.xl,
   },
   loadingText: {

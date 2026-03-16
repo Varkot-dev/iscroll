@@ -29,18 +29,18 @@ export function LearnCard({ post, onChain, onSave, isSaved }: LearnCardProps) {
         styles.container,
         {
           height: windowHeight,
-          paddingTop: insets.top + Spacing['2xl'],
-          paddingBottom: insets.bottom + Spacing.xl,
+          paddingTop: insets.top + 48,
+          paddingBottom: insets.bottom + 32,
         },
       ]}
     >
-      {/* Topic tags */}
+      {/* Topic pills */}
       {post.topics.length > 0 && (
         <View style={styles.topicsRow}>
           {post.topics.map(topic => (
-            <Text key={topic} style={styles.topicTag}>
-              {topic.toUpperCase()}
-            </Text>
+            <View key={topic} style={styles.topicPill}>
+              <Text style={styles.topicText}>{topic.toUpperCase()}</Text>
+            </View>
           ))}
         </View>
       )}
@@ -51,9 +51,10 @@ export function LearnCard({ post, onChain, onSave, isSaved }: LearnCardProps) {
       {/* Content */}
       <Text style={styles.content}>{post.content}</Text>
 
-      {/* Wow fact callout */}
+      {/* Wow fact */}
       {post.wowFact && (
         <View style={styles.wowFactBox}>
+          <Text style={styles.wowFactLabel}>SIGNAL</Text>
           <Text style={styles.wowFactText}>{post.wowFact}</Text>
         </View>
       )}
@@ -63,11 +64,12 @@ export function LearnCard({ post, onChain, onSave, isSaved }: LearnCardProps) {
         <View style={styles.chainContainer}>
           {post.relatedPostId && post.relatedPostTitle && (
             <TouchableOpacity
+              style={styles.chainButton}
               onPress={() => onChain(post.relatedPostId!)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.chainButton}>
-                → {post.relatedPostTitle}
+              <Text style={styles.chainButtonText}>
+                Explore → {post.relatedPostTitle}
               </Text>
             </TouchableOpacity>
           )}
@@ -78,7 +80,7 @@ export function LearnCard({ post, onChain, onSave, isSaved }: LearnCardProps) {
         >
           <Ionicons
             name={isSaved ? 'bookmark' : 'bookmark-outline'}
-            size={24}
+            size={22}
             color={Colors.accent}
           />
         </TouchableOpacity>
@@ -89,59 +91,84 @@ export function LearnCard({ post, onChain, onSave, isSaved }: LearnCardProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.background,
-    paddingHorizontal: Spacing.lg,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 24,
   },
   topicsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
-    marginBottom: Spacing.sm,
   },
-  topicTag: {
-    fontSize: Typography.xs,
+  topicPill: {
+    borderWidth: 1,
+    borderColor: 'rgba(168, 184, 216, 0.3)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  topicText: {
+    fontSize: 10,
     color: Colors.accent,
+    letterSpacing: 1.5,
     fontWeight: '600',
   },
   title: {
-    fontSize: Typography['3xl'],
+    fontSize: 32,
     fontWeight: '700',
     color: Colors.textPrimary,
-    lineHeight: Typography['3xl'] * 1.2,
-    marginTop: Spacing['2xl'],
+    lineHeight: 38,
+    marginTop: 28,
   },
   content: {
-    fontSize: Typography.base,
-    color: Colors.textPrimary,
-    lineHeight: Typography.base * 1.6,
+    fontSize: 16,
+    color: Colors.textSecondary,
+    lineHeight: 26,
     flex: 1,
-    marginTop: Spacing.xl,
+    marginTop: 20,
   },
   wowFactBox: {
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.accent,
-    backgroundColor: Colors.accentLight,
-    padding: Spacing.md,
-    marginTop: Spacing.xl,
+    backgroundColor: Colors.accentGlow,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 184, 216, 0.2)',
+    marginTop: 24,
+  },
+  wowFactLabel: {
+    fontSize: 10,
+    color: Colors.accent,
+    letterSpacing: 2,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   wowFactText: {
-    fontSize: Typography.sm,
+    fontSize: 14,
     color: Colors.textPrimary,
     fontStyle: 'italic',
-    lineHeight: Typography.sm * 1.5,
+    lineHeight: 22,
   },
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: Spacing.xl,
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
   },
   chainContainer: {
     flex: 1,
     marginRight: Spacing.lg,
   },
   chainButton: {
-    fontSize: Typography.base,
+    backgroundColor: Colors.accentLight,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  chainButtonText: {
+    fontSize: 14,
     color: Colors.accent,
     fontWeight: '600',
   },

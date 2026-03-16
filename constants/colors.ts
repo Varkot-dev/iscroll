@@ -8,109 +8,48 @@
  */
 
 export const Colors = {
-  // ==================================================
-  // BASE COLORS
-  // ==================================================
-  // Core dark theme foundation
-  
-  background: '#000000',        // Pure black background
-  surface: '#16181c',           // Slightly lighter surface for cards
-  surfaceHover: '#1c1f23',      // Surface on hover/press state
-  border: '#2f3336',            // Subtle borders and dividers
-  borderLight: '#3a3f44',       // Lighter border for emphasis
-  
-  // ==================================================
-  // TEXT COLORS
-  // ==================================================
-  // Hierarchical text for readability
-  
-  textPrimary: '#e7e9ea',       // Primary text (bright white)
-  textSecondary: '#71767b',     // Secondary text (gray)
-  textTertiary: '#8b98a5',      // Tertiary text (lighter gray)
-  textMuted: '#536471',         // Very subtle text
-  textInverse: '#0f1419',       // Dark text on light backgrounds
-  
-  // ==================================================
-  // BRAND/ACCENT COLORS
-  // ==================================================
-  // Primary interaction colors
-  
-  accent: '#1d9bf0',            // Primary blue (Twitter blue)
-  accentHover: '#1a8cd8',       // Darker blue on press
-  accentLight: 'rgba(29, 155, 240, 0.1)',  // Light blue tint for backgrounds
-  
-  // ==================================================
-  // ENGAGEMENT COLORS
-  // ==================================================
-  // Colors designed to create urgency and FOMO
-  
-  // Hot pink for "NEW" badges - creates visual urgency
-  // Contrast ratio on black: 7.2:1 (Pass AAA)
-  urgentRed: '#f91880',
-  urgentRedLight: 'rgba(249, 24, 128, 0.15)',
-  
-  // Green for "LIVE" updates - signals active/real-time content
-  // Contrast ratio on black: 6.8:1 (Pass AAA)
-  liveGreen: '#00ba7c',
-  liveGreenLight: 'rgba(0, 186, 124, 0.15)',
-  
-  // Purple-blue for "SERIES" badges - sophisticated, educational feel
-  // Contrast ratio on black: 8.1:1 (Pass AAA)
-  seriesBlue: '#7856ff',
-  seriesBlueLight: 'rgba(120, 86, 255, 0.15)',
-  
-  // Amber for notification counts - attention-grabbing but not alarming
-  // Contrast ratio on black: 9.3:1 (Pass AAA)
-  warningAmber: '#ffb84d',
-  warningAmberLight: 'rgba(255, 184, 77, 0.15)',
-  
-  // ==================================================
-  // STATUS COLORS
-  // ==================================================
-  // Semantic colors for states
-  
-  success: '#00ba7c',           // Success states, completed
-  successLight: 'rgba(0, 186, 124, 0.15)',
-  
-  error: '#f4212e',             // Error states, destructive actions
-  errorLight: 'rgba(244, 33, 46, 0.15)',
-  
-  warning: '#ffb84d',           // Warnings, attention needed
-  warningLight: 'rgba(255, 184, 77, 0.15)',
-  
-  info: '#1d9bf0',              // Informational
-  infoLight: 'rgba(29, 155, 240, 0.15)',
-  
-  // ==================================================
-  // SUBSCRIPTION STATES
-  // ==================================================
-  // Colors for subscription UI
-  
-  subscribed: '#1d9bf0',        // Blue when subscribed (active state)
-  unsubscribed: '#71767b',      // Gray when not subscribed
-  subscribedBackground: 'rgba(29, 155, 240, 0.1)',
-  
-  // ==================================================
-  // PROGRESS INDICATORS
-  // ==================================================
-  // Colors for reading progress
-  
-  progressComplete: '#00ba7c',  // Completed episode
-  progressCurrent: '#1d9bf0',   // Currently reading
-  progressUnread: '#2f3336',    // Not yet read
-  
-  // ==================================================
-  // TOPIC CATEGORY COLORS
-  // ==================================================
-  // Distinct colors for different content categories
-  
-  topicScience: '#00ba7c',      // Green - science, biology
-  topicTech: '#1d9bf0',         // Blue - technology, AI
-  topicHistory: '#f97316',      // Orange - history
-  topicEconomics: '#22c55e',    // Emerald - economics, finance
-  topicPsychology: '#a855f7',   // Purple - psychology, neuroscience
-  topicPhysics: '#06b6d4',      // Cyan - physics, space
-  
+  background: '#0a0a0f',
+  surface: '#0f0f18',
+  surfaceCard: 'rgba(15, 15, 24, 0.85)',
+  border: 'rgba(168, 184, 216, 0.1)',
+  borderLight: 'rgba(168, 184, 216, 0.2)',
+  textPrimary: '#e8eaf0',
+  textSecondary: 'rgba(232, 234, 240, 0.5)',
+  textTertiary: 'rgba(232, 234, 240, 0.35)',
+  textMuted: 'rgba(232, 234, 240, 0.25)',
+  textInverse: '#0a0a0f',
+  accent: '#a8b8d8',
+  accentHover: '#8a9fc0',
+  accentLight: 'rgba(168, 184, 216, 0.1)',
+  accentGlow: 'rgba(168, 184, 216, 0.15)',
+  urgentRed: '#ff6b6b',
+  urgentRedLight: 'rgba(255, 107, 107, 0.15)',
+  liveGreen: '#6bcb8b',
+  liveGreenLight: 'rgba(107, 203, 139, 0.15)',
+  seriesBlue: '#7890c8',
+  seriesBlueLight: 'rgba(120, 144, 200, 0.15)',
+  warningAmber: '#f0c070',
+  warningAmberLight: 'rgba(240, 192, 112, 0.15)',
+  success: '#6bcb8b',
+  successLight: 'rgba(107, 203, 139, 0.15)',
+  error: '#ff6b6b',
+  errorLight: 'rgba(255, 107, 107, 0.15)',
+  warning: '#f0c070',
+  warningLight: 'rgba(240, 192, 112, 0.15)',
+  info: '#a8b8d8',
+  infoLight: 'rgba(168, 184, 216, 0.15)',
+  subscribed: '#a8b8d8',
+  unsubscribed: 'rgba(232, 234, 240, 0.3)',
+  subscribedBackground: 'rgba(168, 184, 216, 0.1)',
+  progressComplete: '#6bcb8b',
+  progressCurrent: '#a8b8d8',
+  progressUnread: 'rgba(168, 184, 216, 0.15)',
+  topicScience: '#6bcb8b',
+  topicTech: '#a8b8d8',
+  topicHistory: '#f0c070',
+  topicEconomics: '#6bcb8b',
+  topicPsychology: '#b090d0',
+  topicPhysics: '#80c8e0',
 } as const;
 
 // ==================================================
