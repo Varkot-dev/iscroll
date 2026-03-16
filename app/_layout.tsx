@@ -42,7 +42,7 @@ export default function RootLayout() {
           name="(tabs)" refers to the folder app/(tabs)/
         */}
         <Stack.Screen name="(tabs)" />
-
+        <Stack.Screen name="post/[id]" options={{ headerShown: false }} />
       </Stack>
     </View>
   );

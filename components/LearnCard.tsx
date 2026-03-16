@@ -7,21 +7,25 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Post } from '@/types';
 import { Colors, Typography, Spacing } from '@/constants/colors';
+import { MathContent } from '@/components/MathContent';
 
 type LearnCardProps = {
   post: Post;
   onChain: (relatedPostId: string) => void;
   onSave: (postId: string) => void;
+  onExpand: (postId: string) => void;
   isSaved: boolean;
 };
 
-export function LearnCard({ post, onChain, onSave, isSaved }: LearnCardProps) {
+export function LearnCard({ post, onChain, onSave, onExpand, isSaved }: LearnCardProps) {
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
 
   return (
     <View
@@ -30,34 +34,45 @@ export function LearnCard({ post, onChain, onSave, isSaved }: LearnCardProps) {
         {
           height: windowHeight,
           paddingTop: insets.top + 48,
-          paddingBottom: insets.bottom + 32,
+          paddingBottom: tabBarHeight + 16,
         },
       ]}
     >
-      {/* Topic pills */}
-      {post.topics.length > 0 && (
-        <View style={styles.topicsRow}>
-          {post.topics.map(topic => (
-            <View key={topic} style={styles.topicPill}>
-              <Text style={styles.topicText}>{topic.toUpperCase()}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+      {/* Tappable card body — opens detail screen */}
+      <TouchableOpacity
+        style={styles.cardBody}
+        onPress={() => onExpand(post.id)}
+        activeOpacity={0.85}
+      >
+        {/* Topic pills */}
+        {post.topics.length > 0 && (
+          <View style={styles.topicsRow}>
+            {post.topics.map(topic => (
+              <View key={topic} style={styles.topicPill}>
+                <Text style={styles.topicText}>{topic.toUpperCase()}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
-      {/* Title */}
-      <Text style={styles.title}>{post.title}</Text>
+        {/* Title */}
+        <Text style={styles.title}>{post.title}</Text>
 
-      {/* Content */}
-      <Text style={styles.content}>{post.content}</Text>
+        {/* Content */}
+        <MathContent
+          content={post.content}
+          fontSize={16}
+          lineHeight={26}
+        />
 
-      {/* Wow fact */}
-      {post.wowFact && (
-        <View style={styles.wowFactBox}>
-          <Text style={styles.wowFactLabel}>SIGNAL</Text>
-          <Text style={styles.wowFactText}>{post.wowFact}</Text>
-        </View>
-      )}
+        {/* Wow fact */}
+        {post.wowFact && (
+          <View style={styles.wowFactBox}>
+            <Text style={styles.wowFactLabel}>SIGNAL</Text>
+            <Text style={styles.wowFactText}>{post.wowFact}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
 
       {/* Bottom row */}
       <View style={styles.bottomRow}>
@@ -94,6 +109,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     paddingHorizontal: 24,
   },
+  cardBody: {
+    flex: 1,
+  },
   topicsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -123,7 +141,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textSecondary,
     lineHeight: 26,
-    flex: 1,
     marginTop: 20,
   },
   wowFactBox: {

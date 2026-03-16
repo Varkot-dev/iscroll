@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useRouter } from 'expo-router';
+
 import { usePostFeed } from '@/hooks/usePostFeed';
 import { LearnCard } from '@/components/LearnCard';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -17,6 +19,7 @@ import { StarField } from '@/components/StarField';
 import { FeedItem, ANONYMOUS_USER_ID } from '@/types';
 import { Colors, Typography, Spacing } from '@/constants/colors';
 import { getSavedPosts, getPostById, savePost, unsavePost } from '@/lib/posts';
+import { trackChainTap, trackSave, trackUnsave, trackView } from '@/lib/engagement';
 
 export default function FeedScreenWrapper() {
   return (
@@ -28,10 +31,13 @@ export default function FeedScreenWrapper() {
 
 function FeedScreen() {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const router = useRouter();
   const { items, loading, error, hasMore, refresh, loadMore, appendItemAt } = usePostFeed();
   const flatListRef = useRef<FlatList<FeedItem>>(null);
   const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
   const [chainLoading, setChainLoading] = useState(false);
+  // Track when the currently visible card appeared so we can measure dwell time
+  const viewStartRef = useRef<{ postId: string; topics: string[]; time: number } | null>(null);
 
   useEffect(() => {
     getSavedPosts(ANONYMOUS_USER_ID).then(({ data }) => {
@@ -42,6 +48,11 @@ function FeedScreen() {
   }, []);
 
   const handleChain = useCallback(async (relatedPostId: string, currentIndex: number) => {
+    const currentItem = items[currentIndex];
+    if (currentItem?.type === 'post') {
+      trackChainTap(currentItem.post.id, currentItem.post.topics);
+    }
+
     const existingIndex = items.findIndex(item => item.post.id === relatedPostId);
     if (existingIndex !== -1) {
       flatListRef.current?.scrollToIndex({ index: existingIndex, animated: true });
@@ -57,7 +68,15 @@ function FeedScreen() {
     });
   }, [items, appendItemAt]);
 
+  const handleExpand = useCallback((postId: string) => {
+    const post = items.find(item => item.type === 'post' && item.post.id === postId)?.post;
+    if (!post) return;
+    router.push({ pathname: '/post/[id]', params: { id: postId, post: JSON.stringify(post) } });
+  }, [items, router]);
+
   const handleSave = useCallback(async (postId: string) => {
+    const post = items.find(item => item.type === 'post' && item.post.id === postId)?.post;
+    const topics = post?.topics ?? [];
     const isSaved = savedPostIds.has(postId);
     if (isSaved) {
       setSavedPostIds(prev => {
@@ -65,12 +84,41 @@ function FeedScreen() {
         next.delete(postId);
         return next;
       });
+      trackUnsave(postId, topics);
       await unsavePost(postId, ANONYMOUS_USER_ID);
     } else {
       setSavedPostIds(prev => new Set(prev).add(postId));
+      trackSave(postId, topics);
       await savePost(postId, ANONYMOUS_USER_ID);
     }
-  }, [savedPostIds]);
+  }, [savedPostIds, items]);
+
+  // viewabilityConfig must be stable — defined as a ref so it never changes between renders
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<{ item: FeedItem; index: number | null }> }) => {
+      const visible = viewableItems[0];
+
+      // Flush the dwell time for the card that just left the screen
+      if (viewStartRef.current) {
+        const { postId, topics, time } = viewStartRef.current;
+        const durationMs = Date.now() - time;
+        trackView(postId, topics, durationMs);
+        viewStartRef.current = null;
+      }
+
+      // Start the clock for the new visible card
+      if (visible?.item.type === 'post') {
+        viewStartRef.current = {
+          postId: visible.item.post.id,
+          topics: visible.item.post.topics,
+          time: Date.now(),
+        };
+      }
+    },
+    []
+  );
 
   const renderItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
     if (item.type === 'post') {
@@ -79,12 +127,13 @@ function FeedScreen() {
           post={item.post}
           onChain={(relatedPostId) => handleChain(relatedPostId, index)}
           onSave={handleSave}
+          onExpand={handleExpand}
           isSaved={savedPostIds.has(item.post.id)}
         />
       );
     }
     return null;
-  }, [handleChain, handleSave, savedPostIds]);
+  }, [handleChain, handleSave, handleExpand, savedPostIds]);
 
   const keyExtractor = useCallback((item: FeedItem) => item.id, []);
 
@@ -147,6 +196,8 @@ function FeedScreen() {
         })}
         onEndReached={loadMore}
         onEndReachedThreshold={3}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         removeClippedSubviews
         maxToRenderPerBatch={3}
         windowSize={5}

@@ -14,7 +14,7 @@ export const Colors = {
   border: 'rgba(168, 184, 216, 0.1)',
   borderLight: 'rgba(168, 184, 216, 0.2)',
   textPrimary: '#e8eaf0',
-  textSecondary: 'rgba(232, 234, 240, 0.5)',
+  textSecondary: 'rgba(232, 234, 240, 0.75)',
   textTertiary: 'rgba(232, 234, 240, 0.35)',
   textMuted: 'rgba(232, 234, 240, 0.25)',
   textInverse: '#0a0a0f',

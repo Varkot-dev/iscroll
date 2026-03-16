@@ -23,6 +23,9 @@ type PostRow = {
   wow_fact: string | null;
   related_post_id: string | null;
   related_post_title: string | null;
+  series_id: string | null;
+  series_position: number | null;
+  series_title: string | null;
   depth: number;
   created_at: string;
   updated_at: string;
@@ -88,6 +91,9 @@ function transformPost(
     wowFact: row.wow_fact || undefined,
     relatedPostId: row.related_post_id || undefined,
     relatedPostTitle: row.related_post_title || undefined,
+    seriesId: row.series_id || undefined,
+    seriesPosition: row.series_position || undefined,
+    seriesTitle: row.series_title || undefined,
   };
 }
 

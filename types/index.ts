@@ -35,6 +35,9 @@ export type Post = {
   wowFact?: string;                 // Highlighted callout sentence
   relatedPostId?: string;           // UUID of the next card in the chain
   relatedPostTitle?: string;        // Denormalized for chain button display
+  seriesId?: string;                // UUID grouping all cards from the same article
+  seriesPosition?: number;          // Position in series (1-based)
+  seriesTitle?: string;             // Article title this card belongs to
 };
 
 // ==================================================
