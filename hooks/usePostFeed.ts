@@ -36,16 +36,19 @@ type PostRow = {
   wow_fact: string | null;
   related_post_id: string | null;
   related_post_title: string | null;
+  depth: number;
   created_at: string;
   updated_at: string;
 };
 
-function rowToFeedItem(row: PostRow, topics: string[]): FeedItem {
+function rowToFeedItem(row: PostRow, topics: string[], subtopics: string[]): FeedItem {
   const post: Post = {
     id: row.id,
     title: row.title,
     content: row.content,
     topics,
+    subtopics,
+    depth: row.depth ?? 1,
     publishedAt: row.published_at,
     thumbnailUrl: row.thumbnail_url || undefined,
     sourceUrl: row.source_url || undefined,
@@ -57,19 +60,27 @@ function rowToFeedItem(row: PostRow, topics: string[]): FeedItem {
   return { id: row.id, type: 'post', post } as FeedItem;
 }
 
-async function fetchTopicsForPosts(postIds: string[]): Promise<Map<string, string[]>> {
-  if (postIds.length === 0) return new Map();
-  const { data: topicRows } = await supabase
+async function fetchTopicMaps(postIds: string[]): Promise<{
+  topics: Map<string, string[]>;
+  subtopics: Map<string, string[]>;
+}> {
+  if (postIds.length === 0) return { topics: new Map(), subtopics: new Map() };
+
+  const { data: rows } = await supabase
     .from('post_topics')
-    .select('post_id, topic')
+    .select('post_id, topic, kind')
     .in('post_id', postIds);
 
-  const topicMap = new Map<string, string[]>();
-  (topicRows || []).forEach((t: { post_id: string; topic: string }) => {
-    const existing = topicMap.get(t.post_id) || [];
-    topicMap.set(t.post_id, [...existing, t.topic]);
+  const topics = new Map<string, string[]>();
+  const subtopics = new Map<string, string[]>();
+
+  (rows || []).forEach((t: { post_id: string; topic: string; kind: string }) => {
+    const map = t.kind === 'subtopic' ? subtopics : topics;
+    const existing = map.get(t.post_id) || [];
+    map.set(t.post_id, [...existing, t.topic]);
   });
-  return topicMap;
+
+  return { topics, subtopics };
 }
 
 export function usePostFeed() {
@@ -104,8 +115,10 @@ export function usePostFeed() {
     if (error) throw error;
 
     const rows: PostRow[] = data || [];
-    const topicMap = await fetchTopicsForPosts(rows.map(r => r.id));
-    const items = rows.map(row => rowToFeedItem(row, topicMap.get(row.id) || []));
+    const { topics, subtopics } = await fetchTopicMaps(rows.map(r => r.id));
+    const items = rows.map(row =>
+      rowToFeedItem(row, topics.get(row.id) || [], subtopics.get(row.id) || [])
+    );
 
     const lastRow = rows[rows.length - 1];
     const nextCursor: Cursor = lastRow

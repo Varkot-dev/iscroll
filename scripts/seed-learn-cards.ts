@@ -10,9 +10,13 @@
 
 import * as dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 // Load env vars from .env in project root
-dotenv.config({ path: require('path').join(__dirname, '..', '.env') });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;

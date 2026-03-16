@@ -1,13 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
-import { View, StyleSheet, useWindowDimensions } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  withDelay,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef, useMemo } from 'react';
+import { View, Animated, StyleSheet, useWindowDimensions } from 'react-native';
 
 type Star = {
   id: number;
@@ -20,46 +12,46 @@ type Star = {
   delay: number;
 };
 
+const STAR_COLORS = ['#ffffff', '#ffffff', '#ffffff', '#c8d8f0', '#c8d8f0', '#6070a0'];
+
 function StarDot({ star }: { star: Star }) {
-  const opacity = useSharedValue(star.initialOpacity);
+  const opacity = useRef(new Animated.Value(star.initialOpacity)).current;
 
   useEffect(() => {
-    opacity.value = withDelay(
-      star.delay,
-      withRepeat(
-        withSequence(
-          withTiming(star.initialOpacity * 0.2, { duration: star.duration / 2 }),
-          withTiming(star.initialOpacity, { duration: star.duration / 2 })
-        ),
-        -1,
-        true
-      )
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.delay(star.delay),
+        Animated.timing(opacity, {
+          toValue: star.initialOpacity * 0.15,
+          duration: star.duration / 2,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: star.initialOpacity,
+          duration: star.duration / 2,
+          useNativeDriver: true,
+        }),
+      ])
     );
+    anim.start();
+    return () => anim.stop();
   }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
 
   return (
     <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          left: star.x,
-          top: star.y,
-          width: star.size,
-          height: star.size,
-          borderRadius: star.size / 2,
-          backgroundColor: star.color,
-        },
-        animatedStyle,
-      ]}
+      style={{
+        position: 'absolute',
+        left: star.x,
+        top: star.y,
+        width: star.size,
+        height: star.size,
+        borderRadius: star.size / 2,
+        backgroundColor: star.color,
+        opacity,
+      }}
     />
   );
 }
-
-const STAR_COLORS = ['#ffffff', '#ffffff', '#ffffff', '#c8d8f0', '#c8d8f0', '#6070a0'];
 
 export function StarField() {
   const { width, height } = useWindowDimensions();
@@ -78,7 +70,10 @@ export function StarField() {
   }, [width, height]);
 
   return (
-    <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0a0a0f' }]} pointerEvents="none">
+    <View
+      style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0a0a0f' }]}
+      pointerEvents="none"
+    >
       {stars.map(star => (
         <StarDot key={star.id} star={star} />
       ))}

@@ -23,24 +23,64 @@ type PostRow = {
   wow_fact: string | null;
   related_post_id: string | null;
   related_post_title: string | null;
+  depth: number;
   created_at: string;
   updated_at: string;
 };
 
 type TopicRow = {
+  post_id: string;
   topic: string;
+  kind: 'topic' | 'subtopic';
 };
+
+type TopicMaps = {
+  topics: Map<string, string[]>;
+  subtopics: Map<string, string[]>;
+};
+
+/**
+ * Fetch all topics and subtopics for a list of post IDs.
+ * Returns two maps so callers can pass both to transformPost.
+ */
+async function fetchTopicMaps(postIds: string[]): Promise<TopicMaps> {
+  if (postIds.length === 0) {
+    return { topics: new Map(), subtopics: new Map() };
+  }
+
+  const { data: rows } = await supabase
+    .from('post_topics')
+    .select('post_id, topic, kind')
+    .in('post_id', postIds);
+
+  const topics = new Map<string, string[]>();
+  const subtopics = new Map<string, string[]>();
+
+  (rows || []).forEach((t: TopicRow) => {
+    const map = t.kind === 'subtopic' ? subtopics : topics;
+    const existing = map.get(t.post_id) || [];
+    map.set(t.post_id, [...existing, t.topic]);
+  });
+
+  return { topics, subtopics };
+}
 
 // ==================================================
 // TRANSFORM FUNCTIONS
 // ==================================================
 
-function transformPost(row: PostRow, topics: string[] = []): Post {
+function transformPost(
+  row: PostRow,
+  topics: string[] = [],
+  subtopics: string[] = []
+): Post {
   return {
     id: row.id,
     title: row.title,
     content: row.content,
     topics,
+    subtopics,
+    depth: row.depth ?? 1,
     publishedAt: row.published_at,
     thumbnailUrl: row.thumbnail_url || undefined,
     sourceUrl: row.source_url || undefined,
@@ -81,30 +121,19 @@ export async function getPosts(options: {
     if (error) throw error;
     if (!rows) return { data: [], error: null };
 
-    // Fetch topics for all posts
     const ids = rows.map((r: PostRow) => r.id);
-    const { data: topicRows } = await supabase
-      .from('post_topics')
-      .select('post_id, topic')
-      .in('post_id', ids);
-
-    // Group topics by post
-    const topicMap = new Map<string, string[]>();
-    (topicRows || []).forEach((t: { post_id: string; topic: string }) => {
-      const existing = topicMap.get(t.post_id) || [];
-      topicMap.set(t.post_id, [...existing, t.topic]);
-    });
+    const { topics: topicMap, subtopics: subtopicMap } = await fetchTopicMaps(ids);
 
     // Filter by topic if specified
     let filteredRows = rows;
     if (options.topic) {
-      filteredRows = rows.filter((r: PostRow) => 
+      filteredRows = rows.filter((r: PostRow) =>
         topicMap.get(r.id)?.includes(options.topic!) || false
       );
     }
 
-    const posts = filteredRows.map((row: PostRow) => 
-      transformPost(row, topicMap.get(row.id) || [])
+    const posts = filteredRows.map((row: PostRow) =>
+      transformPost(row, topicMap.get(row.id) || [], subtopicMap.get(row.id) || [])
     );
 
     return { data: posts, error: null };
@@ -131,15 +160,11 @@ export async function getPostById(id: string): Promise<{ data: Post | null; erro
     if (error) throw error;
     if (!row) return { data: null, error: null };
 
-    // Fetch topics
-    const { data: topicRows } = await supabase
-      .from('post_topics')
-      .select('topic')
-      .eq('post_id', id);
-
-    const topics = (topicRows || []).map((t: TopicRow) => t.topic);
-    
-    return { data: transformPost(row, topics), error: null };
+    const { topics: topicMap, subtopics: subtopicMap } = await fetchTopicMaps([id]);
+    return {
+      data: transformPost(row, topicMap.get(id) || [], subtopicMap.get(id) || []),
+      error: null,
+    };
   } catch (error) {
     console.error('Error fetching post:', error);
     return { 
@@ -160,6 +185,8 @@ export async function createPost(post: {
   title: string;
   content: string;
   topics?: string[];
+  subtopics?: string[];
+  depth?: number;
   thumbnailUrl?: string;
   sourceUrl?: string;
   summary?: string;
@@ -168,12 +195,12 @@ export async function createPost(post: {
   relatedPostTitle?: string;
 }): Promise<{ data: Post | null; error: string | null }> {
   try {
-    // Insert post
     const { data: row, error } = await supabase
       .from('posts')
       .insert({
         title: post.title,
         content: post.content,
+        depth: post.depth ?? 1,
         thumbnail_url: post.thumbnailUrl || null,
         source_url: post.sourceUrl || null,
         summary: post.summary || null,
@@ -187,25 +214,22 @@ export async function createPost(post: {
     if (error) throw error;
     if (!row) throw new Error('No row returned from insert');
 
-    // Insert topics if provided
-    if (post.topics && post.topics.length > 0) {
-      const topicInserts = post.topics.map(topic => ({
-        post_id: row.id,
-        topic,
-      }));
+    // Insert topics and subtopics
+    const topicInserts = [
+      ...(post.topics || []).map(topic => ({ post_id: row.id, topic, kind: 'topic' })),
+      ...(post.subtopics || []).map(topic => ({ post_id: row.id, topic, kind: 'subtopic' })),
+    ];
 
+    if (topicInserts.length > 0) {
       const { error: topicError } = await supabase
         .from('post_topics')
         .insert(topicInserts);
-
-      if (topicError) {
-        console.warn('Error inserting topics:', topicError);
-      }
+      if (topicError) console.warn('Error inserting topics:', topicError);
     }
 
-    return { 
-      data: transformPost(row, post.topics || []), 
-      error: null 
+    return {
+      data: transformPost(row, post.topics || [], post.subtopics || []),
+      error: null,
     };
   } catch (error) {
     console.error('Error creating post:', error);
@@ -362,14 +386,12 @@ export async function getSavedPosts(
     for (const item of (data || []) as unknown as SavedPostRow[]) {
       const postRow = item.posts;
       if (postRow) {
-        // Fetch topics
-        const { data: topicRows } = await supabase
-          .from('post_topics')
-          .select('topic')
-          .eq('post_id', postRow.id);
-        
-        const topics = (topicRows || []).map((t: TopicRow) => t.topic);
-        posts.push(transformPost(postRow, topics));
+        const { topics, subtopics } = await fetchTopicMaps([postRow.id]);
+        posts.push(transformPost(
+          postRow,
+          topics.get(postRow.id) || [],
+          subtopics.get(postRow.id) || []
+        ));
       }
     }
 

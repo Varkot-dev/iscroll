@@ -24,8 +24,10 @@
 export type Post = {
   id: string;
   title: string;                    // Post headline
-  content: string;                  // Main content (300-800 words)
-  topics: string[];                 // Topics: ['ai', 'cursor', 'claude', 'weather', 'physics', etc.]
+  content: string;                  // Main content (~150 words)
+  topics: string[];                 // Broad topics: ['physics', 'biology']
+  subtopics: string[];              // Specific subtopics: ['black-holes', 'hawking-radiation']
+  depth: number;                    // 1 (surface) → 5 (expert)
   publishedAt: string;              // When it was published
   thumbnailUrl?: string;            // Optional image
   sourceUrl?: string;               // Optional source link
