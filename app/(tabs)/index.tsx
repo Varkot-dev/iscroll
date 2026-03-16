@@ -1,215 +1,170 @@
-/**
- * FEED SCREEN v2.0 - Rabbit Holes Feed
- * 
- * Main infinite scroll feed showing rabbit holes with:
- * - Subscription updates
- * - Discovery recommendations
- * - Trending content
- * 
- * Uses the new FeedCard component with FOMO-inducing design.
- */
-
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   ActivityIndicator,
-  RefreshControl,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useFeed } from '@/hooks/useFeed';
-import { FeedCard } from '@/components/FeedCard';
-import { FeedItem } from '@/types';
+import { usePostFeed } from '@/hooks/usePostFeed';
+import { LearnCard } from '@/components/LearnCard';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { FeedItem, ANONYMOUS_USER_ID } from '@/types';
 import { Colors, Typography, Spacing } from '@/constants/colors';
+import { getSavedPosts, getPostById, savePost, unsavePost } from '@/lib/posts';
 
-export default function FeedScreen() {
-  // ==================================================
-  // HOOKS
-  // ==================================================
-  
-  const { items, loading, refreshing, error, refresh, loadMore } = useFeed();
-  const router = useRouter();
+export default function FeedScreenWrapper() {
+  return (
+    <ErrorBoundary>
+      <FeedScreen />
+    </ErrorBoundary>
+  );
+}
 
-  // ==================================================
-  // HANDLERS
-  // ==================================================
-  
-  const handleCardPress = useCallback((item: FeedItem) => {
-    router.push({
-      pathname: '/episode/[id]',
-      params: { 
-        id: item.episode.id,
-        rabbitHoleId: item.episode.rabbitHoleId,
-      },
+function FeedScreen() {
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const { items, loading, error, hasMore, refresh, loadMore, appendItemAt } = usePostFeed();
+  const flatListRef = useRef<FlatList<FeedItem>>(null);
+  const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
+  const [chainLoading, setChainLoading] = useState(false);
+
+  useEffect(() => {
+    getSavedPosts(ANONYMOUS_USER_ID).then(({ data }) => {
+      if (data) {
+        setSavedPostIds(new Set(data.map(p => p.id)));
+      }
     });
-  }, [router]);
+  }, []);
 
-  // ==================================================
-  // RENDER ITEM
-  // ==================================================
+  const handleChain = useCallback(async (relatedPostId: string, currentIndex: number) => {
+    const existingIndex = items.findIndex(item => item.post.id === relatedPostId);
+    if (existingIndex !== -1) {
+      flatListRef.current?.scrollToIndex({ index: existingIndex, animated: true });
+      return;
+    }
+    setChainLoading(true);
+    const { data: post } = await getPostById(relatedPostId);
+    setChainLoading(false);
+    if (!post) return;
+    appendItemAt(post, currentIndex);
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
+    });
+  }, [items, appendItemAt]);
 
-  const renderItem = useCallback(({ item }: { item: FeedItem }) => (
-    <FeedCard
-      episode={item.episode}
-      rabbitHoleTitle={item.rabbitHole.title}
-      hookText={item.rabbitHole.hookText}
-      topics={item.rabbitHole.topics}
-      onPress={() => handleCardPress(item)}
-    />
-  ), [handleCardPress]);
+  const handleSave = useCallback(async (postId: string) => {
+    const isSaved = savedPostIds.has(postId);
+    if (isSaved) {
+      setSavedPostIds(prev => {
+        const next = new Set(prev);
+        next.delete(postId);
+        return next;
+      });
+      await unsavePost(postId, ANONYMOUS_USER_ID);
+    } else {
+      setSavedPostIds(prev => new Set(prev).add(postId));
+      await savePost(postId, ANONYMOUS_USER_ID);
+    }
+  }, [savedPostIds]);
+
+  const renderItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
+    if (item.type === 'post') {
+      return (
+        <LearnCard
+          post={item.post}
+          onChain={(relatedPostId) => handleChain(relatedPostId, index)}
+          onSave={handleSave}
+          isSaved={savedPostIds.has(item.post.id)}
+        />
+      );
+    }
+    return null;
+  }, [handleChain, handleSave, savedPostIds]);
 
   const keyExtractor = useCallback((item: FeedItem) => item.id, []);
 
-  // ==================================================
-  // LOADING STATE
-  // ==================================================
-  
   if (loading && items.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-      <Header />
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={Colors.accent} />
-          <Text style={styles.loadingText}>Loading rabbit holes...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
     );
   }
 
-  // ==================================================
-  // ERROR STATE
-  // ==================================================
-  
   if (error && items.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-      <Header />
-        <View style={styles.centered}>
-          <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={refresh}>
-            <Text style={styles.retryText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centered}>
+        <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+          <Text style={styles.retryText}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
-
-  // ==================================================
-  // EMPTY STATE
-  // ==================================================
 
   if (items.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Header updateCount={0} />
-        <View style={styles.centered}>
-          <Ionicons name="planet-outline" size={64} color={Colors.textMuted} />
-          <Text style={styles.emptyTitle}>No rabbit holes yet</Text>
-          <Text style={styles.emptyText}>
-            Content is being generated. Pull down to refresh!
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={refresh}>
-            <Ionicons name="refresh" size={18} color={Colors.accent} />
-            <Text style={styles.retryText}>Refresh</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centered}>
+        <Ionicons name="planet-outline" size={64} color={Colors.textMuted} />
+        <Text style={styles.emptyTitle}>No posts yet</Text>
+        <Text style={styles.emptyText}>Content is being generated. Pull down to refresh!</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+          <Ionicons name="refresh" size={18} color={Colors.accent} />
+          <Text style={styles.retryText}>Refresh</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
-  // ==================================================
-  // MAIN RENDER
-  // ==================================================
-  
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header />
-      
+    <View style={styles.container}>
       <FlatList
+        ref={flatListRef}
         data={items}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refresh}
-            tintColor={Colors.accent}
-            colors={[Colors.accent]}
-            progressBackgroundColor={Colors.background}
-          />
-        }
-        contentContainerStyle={styles.listContent}
+        pagingEnabled
+        snapToInterval={SCREEN_HEIGHT}
+        snapToAlignment="start"
+        decelerationRate="fast"
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={5}
-        windowSize={10}
-        ListFooterComponent={
-          loading && items.length > 0 ? (
-            <View style={styles.footer}>
-              <ActivityIndicator size="small" color={Colors.accent} />
-            </View>
-          ) : null
-        }
+        getItemLayout={(_, index) => ({
+          length: SCREEN_HEIGHT,
+          offset: SCREEN_HEIGHT * index,
+          index,
+        })}
+        onEndReached={loadMore}
+        onEndReachedThreshold={3}
+        removeClippedSubviews
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        initialNumToRender={1}
       />
-    </SafeAreaView>
-  );
-}
-
-// ==================================================
-// HEADER COMPONENT
-// ==================================================
-
-function Header() {
-  return (
-    <View style={styles.header}>
-      <Text style={styles.title}>iScroll</Text>
-      <Text style={styles.subtitle}>Discover something interesting</Text>
+      {chainLoading && (
+        <View style={styles.chainLoadingOverlay}>
+          <ActivityIndicator size="large" color={Colors.accent} />
+        </View>
+      )}
     </View>
   );
 }
-
-// ==================================================
-// STYLES
-// ==================================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
   },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  title: {
-    fontSize: Typography.xl,
-    fontWeight: Typography.bold,
-    color: Colors.textPrimary,
-  },
-  subtitle: {
-    fontSize: Typography.sm,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  listContent: {
-    paddingVertical: 0,
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: Colors.background,
     padding: Spacing.xl,
   },
   loadingText: {
@@ -226,7 +181,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: Typography.lg,
-    fontWeight: Typography.bold,
+    fontWeight: '700',
     color: Colors.textPrimary,
     marginTop: Spacing.xl,
     marginBottom: Spacing.sm,
@@ -250,10 +205,13 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: Typography.base,
     color: Colors.accent,
-    fontWeight: Typography.medium,
+    fontWeight: '500',
   },
-  footer: {
-    padding: Spacing.xl,
+  chainLoadingOverlay: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
+    right: 0,
     alignItems: 'center',
   },
 });

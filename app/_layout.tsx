@@ -24,12 +24,10 @@ export default function RootLayout() {
       */}
       <StatusBar style="light" />
       
-      {/* 
+      {/*
         Stack Navigator: Manages screen transitions
         - "(tabs)" is a special route that contains our tab navigation
-        - "rabbit-hole/[id]" displays a rabbit hole with its episodes
-        - "episode/[id]" displays individual episode content
-        - "thread/[id]" is legacy route for Wikipedia articles
+        - "post/[id]" displays full post content
       */}
       <Stack
         screenOptions={{
@@ -39,51 +37,12 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: '#000000' },
         }}
       >
-        {/* 
+        {/*
           The tabs screen - this contains our bottom tab navigation
           name="(tabs)" refers to the folder app/(tabs)/
         */}
         <Stack.Screen name="(tabs)" />
-        
-        {/* 
-          Rabbit Hole screen - shows the full rabbit hole with episodes
-          [id] captures the rabbit hole ID from the URL
-          Example: /rabbit-hole/abc-123 → id = "abc-123"
-        */}
-        <Stack.Screen 
-          name="rabbit-hole/[id]" 
-          options={{
-            gestureEnabled: true,
-            animation: 'slide_from_right',
-          }}
-        />
-        
-        {/* 
-          Episode screen - for reading full episode content
-          [id] captures the episode ID from the URL
-          Example: /episode/xyz-456 → id = "xyz-456"
-        */}
-        <Stack.Screen 
-          name="episode/[id]" 
-          options={{
-            gestureEnabled: true,
-            animation: 'slide_from_right',
-          }}
-        />
-        
-        {/* 
-          Thread screen - legacy route for Wikipedia articles
-          Kept for backward compatibility
-          [id] is a dynamic segment
-          Example: /thread/12345 → id = "12345"
-        */}
-        <Stack.Screen 
-          name="thread/[id]" 
-          options={{
-            gestureEnabled: true,
-            animation: 'slide_from_right',
-          }}
-        />
+
       </Stack>
     </View>
   );

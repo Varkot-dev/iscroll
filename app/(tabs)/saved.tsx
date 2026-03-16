@@ -1,10 +1,5 @@
 /**
- * SAVED SCREEN v2.0 - Subscribed Rabbit Holes
- * 
- * Shows all rabbit holes the user is subscribed to with:
- * - Unread episode counts
- * - Quick access to continue watching
- * - Subscription management
+ * SAVED SCREEN - Bookmarked posts
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -18,161 +13,96 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useSubscriptions, getTotalUnreadCount } from '@/hooks/useSubscriptions';
-import { CompactFeedCard } from '@/components/FeedCard';
-import { SubscriptionWithDetails, ANONYMOUS_USER_ID } from '@/types';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/colors';
+import { getSavedPosts, unsavePost } from '@/lib/posts';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { Post, ANONYMOUS_USER_ID } from '@/types';
+import { Colors, Typography, Spacing } from '@/constants/colors';
 
-export default function SavedScreen() {
-  // ==================================================
-  // HOOKS
-  // ==================================================
-  
-  const { 
-    getSubscriptionsWithUnread, 
-    unsubscribe,
-    loading: hookLoading,
-    refresh,
-  } = useSubscriptions(ANONYMOUS_USER_ID);
-  
-  const router = useRouter();
-  
-  // ==================================================
-  // STATE
-  // ==================================================
-  
-  const [subscriptions, setSubscriptions] = useState<SubscriptionWithDetails[]>([]);
+export default function SavedScreenWrapper() {
+  return (
+    <ErrorBoundary>
+      <SavedScreen />
+    </ErrorBoundary>
+  );
+}
+
+function SavedScreen() {
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [totalUnread, setTotalUnread] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-  // ==================================================
-  // FETCH DATA
-  // ==================================================
-  
   const fetchData = useCallback(async () => {
-    try {
-      const subs = await getSubscriptionsWithUnread();
-      setSubscriptions(subs);
-      
-      const unread = await getTotalUnreadCount(ANONYMOUS_USER_ID);
-      setTotalUnread(unread);
-    } catch (error) {
-      console.error('Error fetching subscriptions:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    const { data, error: fetchError } = await getSavedPosts(ANONYMOUS_USER_ID);
+    if (fetchError) {
+      setError(fetchError);
+    } else {
+      setPosts(data);
+      setError(null);
     }
-  }, [getSubscriptionsWithUnread]);
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // ==================================================
-  // HANDLERS
-  // ==================================================
-  
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    await refresh();
-    await fetchData();
-  }, [refresh, fetchData]);
+    fetchData();
+  }, [fetchData]);
 
-  const handleItemPress = useCallback((item: SubscriptionWithDetails) => {
-    router.push({
-      pathname: '/rabbit-hole/[id]',
-      params: { id: item.rabbitHoleId },
-    });
-  }, [router]);
+  const handleUnsave = useCallback(async (postId: string) => {
+    await unsavePost(postId, ANONYMOUS_USER_ID);
+    setPosts(prev => prev.filter(p => p.id !== postId));
+  }, []);
 
-  const handleUnsubscribe = useCallback(async (item: SubscriptionWithDetails) => {
-    await unsubscribe(item.rabbitHoleId);
-    setSubscriptions(prev => prev.filter(s => s.id !== item.id));
-  }, [unsubscribe]);
+  const renderItem = useCallback(({ item }: { item: Post }) => (
+    <SavedPostRow post={item} onUnsave={handleUnsave} />
+  ), [handleUnsave]);
 
-  // ==================================================
-  // RENDER ITEM
-  // ==================================================
+  const keyExtractor = useCallback((item: Post) => item.id, []);
 
-  const renderItem = useCallback(({ item }: { item: SubscriptionWithDetails }) => (
-    <View style={styles.itemContainer}>
-      <CompactFeedCard
-        rabbitHole={item.rabbitHole}
-        onPress={() => handleItemPress(item)}
-        unreadCount={item.unreadCount}
-      />
-      
-      {/* Unsubscribe button */}
-      <TouchableOpacity
-        onPress={() => handleUnsubscribe(item)}
-        style={styles.unsubscribeButton}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Ionicons name="notifications" size={20} color={Colors.accent} />
-      </TouchableOpacity>
-    </View>
-  ), [handleItemPress, handleUnsubscribe]);
-
-  const keyExtractor = useCallback((item: SubscriptionWithDetails) => item.id, []);
-
-  // ==================================================
-  // LOADING STATE
-  // ==================================================
-  
-  if (loading && subscriptions.length === 0) {
+  if (loading && posts.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <Header totalUnread={0} count={0} />
+        <Header count={0} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.accent} />
-          <Text style={styles.loadingText}>Loading subscriptions...</Text>
+          <Text style={styles.loadingText}>Loading saved posts...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // ==================================================
-  // EMPTY STATE
-  // ==================================================
-  
-  const EmptyState = () => (
-    <View style={styles.emptyState}>
-      <View style={styles.emptyIconContainer}>
-        <Ionicons name="notifications-outline" size={64} color={Colors.textMuted} />
-      </View>
-      <Text style={styles.emptyTitle}>No subscriptions yet</Text>
-      <Text style={styles.emptyText}>
-        Subscribe to rabbit holes to follow their journey and get notified of new episodes
-      </Text>
-      <TouchableOpacity
-        style={styles.browseButton}
-        onPress={() => router.push('/')}
-      >
-        <Ionicons name="planet-outline" size={20} color={Colors.accent} />
-        <Text style={styles.browseButtonText}>Explore Rabbit Holes</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  if (error && posts.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header count={0} />
+        <View style={styles.centered}>
+          <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+            <Text style={styles.retryText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-  // ==================================================
-  // MAIN RENDER
-  // ==================================================
-  
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Header totalUnread={totalUnread} count={subscriptions.length} />
-
+      <Header count={posts.length} />
       <FlatList
-        data={subscriptions}
+        data={posts}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         contentContainerStyle={[
           styles.listContent,
-          subscriptions.length === 0 && styles.emptyListContent,
+          posts.length === 0 && styles.emptyListContent,
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -184,42 +114,59 @@ export default function SavedScreen() {
             progressBackgroundColor={Colors.background}
           />
         }
-        ListEmptyComponent={EmptyState}
-        ListHeaderComponent={
-          subscriptions.length > 0 && totalUnread > 0 ? (
-            <View style={styles.unreadBanner}>
-              <Ionicons name="mail-unread" size={18} color={Colors.warningAmber} />
-              <Text style={styles.unreadBannerText}>
-                {totalUnread} unread episode{totalUnread !== 1 ? 's' : ''} waiting for you
-              </Text>
-            </View>
-          ) : null
-        }
+        ListEmptyComponent={<EmptyState />}
       />
     </SafeAreaView>
   );
 }
 
-// ==================================================
-// HEADER COMPONENT
-// ==================================================
+function SavedPostRow({ post, onUnsave }: { post: Post; onUnsave: (id: string) => void }) {
+  return (
+    <View style={styles.savedRow}>
+      <View style={styles.savedRowContent}>
+        {post.topics.length > 0 && (
+          <Text style={styles.savedRowTopics}>
+            {post.topics.slice(0, 2).map(t => t.toUpperCase()).join(' · ')}
+          </Text>
+        )}
+        <Text style={styles.savedRowTitle} numberOfLines={2}>{post.title}</Text>
+        {post.summary && (
+          <Text style={styles.savedRowSummary} numberOfLines={2}>{post.summary}</Text>
+        )}
+      </View>
+      <TouchableOpacity
+        onPress={() => onUnsave(post.id)}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        style={styles.unsaveButton}
+      >
+        <Ionicons name="bookmark" size={20} color={Colors.accent} />
+      </TouchableOpacity>
+    </View>
+  );
+}
 
-function Header({ totalUnread, count }: { totalUnread: number; count: number }) {
+function Header({ count }: { count: number }) {
   return (
     <View style={styles.header}>
-      <Text style={styles.title}>Following</Text>
+      <Text style={styles.title}>Saved</Text>
       <Text style={styles.subtitle}>
-        {count > 0
-          ? `${count} rabbit hole${count !== 1 ? 's' : ''}`
-          : 'Your subscribed rabbit holes'}
+        {count > 0 ? `${count} post${count !== 1 ? 's' : ''}` : 'Your bookmarked posts'}
       </Text>
     </View>
   );
 }
 
-// ==================================================
-// STYLES
-// ==================================================
+function EmptyState() {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIconContainer}>
+        <Ionicons name="bookmark-outline" size={64} color={Colors.textMuted} />
+      </View>
+      <Text style={styles.emptyTitle}>No saved posts yet</Text>
+      <Text style={styles.emptyText}>Bookmark posts to read them later</Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -235,7 +182,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Typography['2xl'],
-    fontWeight: Typography.bold,
+    fontWeight: '700',
     color: Colors.textPrimary,
     marginBottom: 2,
   },
@@ -244,7 +191,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   listContent: {
-    padding: Spacing.lg,
+    paddingVertical: 0,
   },
   emptyListContent: {
     flex: 1,
@@ -260,42 +207,63 @@ const styles = StyleSheet.create({
     fontSize: Typography.base,
     color: Colors.textSecondary,
   },
-
-  // Unread banner
-  unreadBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.warningAmberLight,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+  errorText: {
+    fontSize: Typography.base,
+    color: Colors.error,
+    textAlign: 'center',
+    marginTop: Spacing.md,
     marginBottom: Spacing.lg,
   },
-  unreadBannerText: {
+  retryButton: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  retryText: {
+    fontSize: Typography.base,
+    color: Colors.accent,
+  },
+  savedRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  savedRowContent: {
+    flex: 1,
+    marginRight: Spacing.lg,
+  },
+  savedRowTopics: {
+    fontSize: Typography.xs,
+    color: Colors.accent,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
+  },
+  savedRowTitle: {
+    fontSize: Typography.base,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    lineHeight: Typography.base * 1.3,
+  },
+  savedRowSummary: {
     fontSize: Typography.sm,
-    color: Colors.warningAmber,
-    fontWeight: Typography.medium,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+    lineHeight: Typography.sm * 1.4,
   },
-
-  // Item container
-  itemContainer: {
-    position: 'relative',
-    marginBottom: 0,
+  unsaveButton: {
+    paddingTop: 2,
   },
-  unsubscribeButton: {
-    position: 'absolute',
-    right: Spacing.lg,
-    top: '50%',
-    transform: [{ translateY: -10 }],
-    padding: Spacing.sm,
-  },
-
-  // Empty state
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing['3xl'],
+    paddingTop: Spacing['3xl'],
   },
   emptyIconContainer: {
     width: 120,
@@ -308,7 +276,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: Typography.lg,
-    fontWeight: Typography.bold,
+    fontWeight: '700',
     color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
@@ -316,22 +284,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.base,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: Typography.base * Typography.relaxed,
-    marginBottom: Spacing.xl,
-  },
-  browseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-  },
-  browseButtonText: {
-    fontSize: Typography.base,
-    color: Colors.accent,
-    fontWeight: Typography.semibold,
+    lineHeight: Typography.base * 1.5,
   },
 });

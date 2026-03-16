@@ -1,29 +1,15 @@
 /**
  * SUPABASE CLIENT
- * 
- * This file creates a connection to your Supabase database.
- * Other files import 'supabase' from here to read/write data.
- * 
- * KEY CONCEPTS:
- * - Environment variables: process.env.VARIABLE_NAME reads from .env file
- * - EXPO_PUBLIC_ prefix: Makes the variable available in your app
- * - createClient(): Creates a connection to Supabase
- * 
- * SETUP REQUIRED:
- * 1. Create a Supabase project at supabase.com
- * 2. Create a .env file in your project root with:
- *    EXPO_PUBLIC_SUPABASE_URL=your_url_here
- *    EXPO_PUBLIC_SUPABASE_ANON_KEY=your_key_here
+ *
+ * Creates a connection to Supabase and manages anonymous auth.
+ * Call getAnonymousUserId() to get a stable UUID for the current device.
  */
 
 import { createClient } from '@supabase/supabase-js';
 
-// Read credentials from environment variables
-// These come from the .env file you create
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-// Check if credentials are missing and show helpful error
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
     '⚠️ Supabase credentials missing!\n' +
@@ -34,37 +20,32 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-/**
- * The Supabase client instance
- * 
- * Usage in other files:
- * 
- * import { supabase } from '@/lib/supabase';
- * 
- * // Read data
- * const { data, error } = await supabase
- *   .from('saved_items')
- *   .select('*');
- * 
- * // Insert data
- * const { error } = await supabase
- *   .from('saved_items')
- *   .insert({ title: 'Article Title', wikipedia_id: '12345' });
- */
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder-key'
 );
 
 /**
- * Type definitions for our database tables
- * This helps TypeScript know what columns exist
+ * Returns a stable anonymous user ID for this device.
+ * Signs in anonymously via Supabase on first call; subsequent calls
+ * return the cached session user ID.
+ *
+ * Falls back to the legacy 'anonymous' constant if auth fails.
  */
-export type SavedItem = {
-  id: string;
-  wikipedia_id: string;
-  title: string;
-  extract?: string;        // Short description
-  thumbnail_url?: string;  // Image URL
-  saved_at: string;        // ISO timestamp
-};
+export async function getAnonymousUserId(): Promise<string> {
+  // Check for an existing session first
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user?.id) {
+    return session.user.id;
+  }
+
+  // Sign in anonymously — Supabase persists this session automatically
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error || !data.user) {
+    console.warn('Anonymous sign-in failed, falling back to hardcoded ID:', error?.message);
+    return 'anonymous';
+  }
+
+  return data.user.id;
+}
+

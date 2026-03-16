@@ -163,10 +163,10 @@ export const Typography = {
   
   // Line heights
   tight: 1.2,
-  normal: 1.4,
+  lineNormal: 1.4,
   relaxed: 1.6,
   loose: 1.8,
-  
+
   // Font weights
   normal: '400' as const,
   medium: '500' as const,

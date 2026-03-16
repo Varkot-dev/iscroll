@@ -59,7 +59,7 @@ export function Badge({ type, count, size = 'sm', style }: BadgeProps) {
       text = 'COMING SOON';
       break;
     default:
-      text = type.toUpperCase();
+      text = (type as string).toUpperCase();
   }
 
   const isSmall = size === 'sm';
