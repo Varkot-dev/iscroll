@@ -38,6 +38,8 @@ type CardDef = {
   content: string;
   wowFact: string;
   topics: string[];
+  subtopics: string[];  // specific subtopics within the broad topic
+  depth: number;        // 1 (surface) → 5 (expert)
   summary: string;
   nextKey: string | null;
 };

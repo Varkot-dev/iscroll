@@ -16,22 +16,24 @@ iScroll is a TikTok-style full-screen snap-scroll learning feed. Each card is a 
 
 ### What's built
 - Full-screen snap-scroll feed (`app/(tabs)/index.tsx`) using `FlatList` with `pagingEnabled`
-- `LearnCard` component — title, content, wow fact callout, chain button, bookmark
-- `usePostFeed` hook — cursor-based pagination, `appendItemAt` for mid-feed injection, loadingMoreRef mutex
+- `LearnCard` component — title, content, SIGNAL callout box, chain button, bookmark
+- `StarField` component — 80 twinkling stars using React Native `Animated` (not reanimated)
+- Deep space UI theme — `#0a0a0f` background, `#a8b8d8` accent, minimal typography
+- `usePostFeed` hook — cursor-based pagination, `appendItemAt` for mid-feed injection
 - Chain mechanic — tap a link to inject the next related card directly after current position
 - Save/unsave posts — persisted to Supabase `saved_posts` table
 - Saved tab — display-only list of bookmarked posts
-- Supabase schema — `posts`, `post_topics`, `saved_posts`, `engagement_events` tables + chain columns
-- `topic_engagement_scores` view — pre-aggregated topic scores for adaptive depth algorithm
-- `lib/engagement.ts` — trackView, trackChainTap, trackSave, trackUnsave (non-critical, never throws)
-- `getPostsByTopic` in `lib/posts.ts` — cursor-paginated topic-filtered post fetching
+- Supabase schema — `posts`, `post_topics`, `saved_posts` tables + chain columns
 - Seed script — 50 learn cards across 12 topic chains
 - CLAUDE.md + PRIMER.md — session onboarding and engineering log
 
 ### What's NOT done yet
-- UI polish on LearnCard (currently functional but visually rough)
-- Wire engagement tracking into the UI (lib/engagement.ts exists but isn't called yet)
-- Adaptive depth feed algorithm (data layer ready, feed logic not built)
+- Text brightness fix (body text `textSecondary` too dim)
+- Wikipedia scraper — auto-generate cards from real articles (free, no API key)
+- Series/context system — group cards by article, `series_id`, `series_position`
+- "Need context?" panel — horizontal chain map showing position in series
+- Expand/collapse card mechanic with image
+- Adaptive depth feed algorithm
 - PDF ingestion
 - Animations
 
@@ -90,6 +92,11 @@ Supabase → lib/posts.ts → usePostFeed → index.tsx → LearnCard
 - **Non-critical operations must never throw.** `lib/engagement.ts` catches all errors and logs warnings instead. A failed analytics write should never crash the user experience. Pattern: wrap in try/catch, console.warn, return gracefully.
 - **Use refs not state for mutexes.** `loadingMoreRef` in `usePostFeed` prevents stacked fetches from rapid scrolling. A `useRef` is the right tool here because changing it shouldn't trigger a re-render — it's an internal implementation detail, not UI state.
 - **Build the data layer before the UI layer.** Engagement tracking infrastructure (table, view, lib functions) was built before any UI wires into it. When UI work starts, the plumbing is already there. Don't design UI and data simultaneously.
+- **Don't use react-native-reanimated for background effects in Expo Go.** The reanimated native binary version in Expo Go often mismatches the JS version after SDK upgrades. For non-critical animations like StarField, use React Native's built-in `Animated` API instead — zero native dependency, works everywhere.
+- **Expo SDK upgrades require peer dep flags.** `npm install expo@~54.0.0 --legacy-peer-deps` is the reliable upgrade path. `npx expo install --fix` alone fails when there are peer conflicts.
+- **Always pin reanimated to the Expo SDK compatible version.** After SDK upgrade, run `npx expo install react-native-reanimated` (not `npm install`) to get the correct version. Never manually install `react-native-worklets` — it's an internal dep of reanimated v4 and causes version mismatches in Expo Go.
+- **Seed scripts need ES module compatible imports.** When `package.json` has `"type": "module"` or tsconfig targets ESM, `require()` and `__dirname` are unavailable. Use `import` and `fileURLToPath(import.meta.url)` instead. Run with `ts-node --esm`.
+- **MASTER GUIDELINES.md is the source of truth for engineering principles.** Key rules: ship smallest working slice first (Gall's Law), build only what's needed now (YAGNI), data integrity enforced at DB layer, abstract only after third repetition, non-critical ops never throw. Read it at the start of every session.
 
 ---
 
