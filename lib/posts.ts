@@ -25,6 +25,7 @@ type PostRow = {
   related_post_title: string | null;
   series_id: string | null;
   series_position: number | null;
+  series_total: number | null;
   series_title: string | null;
   depth: number;
   created_at: string;
@@ -93,6 +94,7 @@ function transformPost(
     relatedPostTitle: row.related_post_title || undefined,
     seriesId: row.series_id || undefined,
     seriesPosition: row.series_position || undefined,
+    seriesTotal: row.series_total || undefined,
     seriesTitle: row.series_title || undefined,
   };
 }

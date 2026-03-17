@@ -7,7 +7,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { FeedItem, Post } from '@/types';
+import { getTopEngagedTopics } from '@/lib/engagement';
+import { FeedItem, Post, ANONYMOUS_USER_ID } from '@/types';
 
 type FeedState = {
   items: FeedItem[];
@@ -36,6 +37,10 @@ type PostRow = {
   wow_fact: string | null;
   related_post_id: string | null;
   related_post_title: string | null;
+  series_id: string | null;
+  series_position: number | null;
+  series_total: number | null;
+  series_title: string | null;
   depth: number;
   created_at: string;
   updated_at: string;
@@ -56,6 +61,10 @@ function rowToFeedItem(row: PostRow, topics: string[], subtopics: string[]): Fee
     wowFact: row.wow_fact || undefined,
     relatedPostId: row.related_post_id || undefined,
     relatedPostTitle: row.related_post_title || undefined,
+    seriesId: row.series_id || undefined,
+    seriesPosition: row.series_position || undefined,
+    seriesTotal: row.series_total || undefined,
+    seriesTitle: row.series_title || undefined,
   };
   return { id: row.id, type: 'post', post } as FeedItem;
 }
@@ -92,6 +101,7 @@ export function usePostFeed() {
     hasMore: true,
   });
   const [cursor, setCursor] = useState<Cursor>(null);
+  const [engagedTopics, setEngagedTopics] = useState<Set<string>>(new Set());
   // Ref (not state) so it doesn't trigger re-renders — just a mutex
   // to prevent multiple loadMore calls firing simultaneously
   const loadingMoreRef = useRef(false);
@@ -132,8 +142,12 @@ export function usePostFeed() {
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      const { items, nextCursor } = await fetchBatch(null);
+      const [{ items, nextCursor }, topTopics] = await Promise.all([
+        fetchBatch(null),
+        getTopEngagedTopics(ANONYMOUS_USER_ID, 5),
+      ]);
       setCursor(nextCursor);
+      setEngagedTopics(new Set(topTopics.map(t => t.topic)));
       setState({
         items,
         loading: false,
@@ -212,6 +226,7 @@ export function usePostFeed() {
     refreshing: state.refreshing,
     error: state.error,
     hasMore: state.hasMore,
+    engagedTopics,
     refresh,
     loadMore,
     appendItemAt,

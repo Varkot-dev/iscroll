@@ -32,7 +32,7 @@ export default function FeedScreenWrapper() {
 function FeedScreen() {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const router = useRouter();
-  const { items, loading, error, hasMore, refresh, loadMore, appendItemAt } = usePostFeed();
+  const { items, loading, error, hasMore, refresh, loadMore, appendItemAt, engagedTopics } = usePostFeed();
   const flatListRef = useRef<FlatList<FeedItem>>(null);
   const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
   const [chainLoading, setChainLoading] = useState(false);
@@ -129,11 +129,12 @@ function FeedScreen() {
           onSave={handleSave}
           onExpand={handleExpand}
           isSaved={savedPostIds.has(item.post.id)}
+          isEngagedTopic={item.post.topics.some(t => engagedTopics.has(t))}
         />
       );
     }
     return null;
-  }, [handleChain, handleSave, handleExpand, savedPostIds]);
+  }, [handleChain, handleSave, handleExpand, savedPostIds, engagedTopics]);
 
   const keyExtractor = useCallback((item: FeedItem) => item.id, []);
 

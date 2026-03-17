@@ -20,12 +20,17 @@ type LearnCardProps = {
   onSave: (postId: string) => void;
   onExpand: (postId: string) => void;
   isSaved: boolean;
+  isEngagedTopic: boolean;
 };
 
-export function LearnCard({ post, onChain, onSave, onExpand, isSaved }: LearnCardProps) {
+export function LearnCard({ post, onChain, onSave, onExpand, isSaved, isEngagedTopic }: LearnCardProps) {
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
+
+  const seriesProgress = post.seriesId && post.seriesPosition && post.seriesTotal
+    ? post.seriesPosition / post.seriesTotal
+    : null;
 
   return (
     <View
@@ -38,21 +43,40 @@ export function LearnCard({ post, onChain, onSave, onExpand, isSaved }: LearnCar
         },
       ]}
     >
+      {/* Series progress bar — thin line at top of card */}
+      {seriesProgress !== null && (
+        <View style={styles.seriesBarTrack}>
+          <View style={[styles.seriesBarFill, { width: `${seriesProgress * 100}%` }]} />
+        </View>
+      )}
+
       {/* Tappable card body — opens detail screen */}
       <TouchableOpacity
         style={styles.cardBody}
         onPress={() => onExpand(post.id)}
         activeOpacity={0.85}
       >
-        {/* Topic pills */}
+        {/* Topic pills + engagement pulse */}
         {post.topics.length > 0 && (
           <View style={styles.topicsRow}>
             {post.topics.map(topic => (
-              <View key={topic} style={styles.topicPill}>
-                <Text style={styles.topicText}>{topic.toUpperCase()}</Text>
+              <View key={topic} style={[styles.topicPill, isEngagedTopic && styles.topicPillEngaged]}>
+                <Text style={[styles.topicText, isEngagedTopic && styles.topicTextEngaged]}>{topic.toUpperCase()}</Text>
               </View>
             ))}
+            {isEngagedTopic && (
+              <View style={styles.orbitPill}>
+                <Text style={styles.orbitText}>IN YOUR ORBIT</Text>
+              </View>
+            )}
           </View>
+        )}
+
+        {/* Series position label */}
+        {post.seriesId && post.seriesPosition && post.seriesTotal && (
+          <Text style={styles.seriesLabel}>
+            {post.seriesTitle ? `${post.seriesTitle} · ` : ''}{post.seriesPosition} of {post.seriesTotal}
+          </Text>
         )}
 
         {/* Title */}
@@ -109,6 +133,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     paddingHorizontal: 24,
   },
+  seriesBarTrack: {
+    height: 2,
+    backgroundColor: Colors.border,
+    borderRadius: 1,
+    marginBottom: Spacing.lg,
+    overflow: 'hidden',
+  },
+  seriesBarFill: {
+    height: 2,
+    backgroundColor: Colors.seriesBlue,
+    borderRadius: 1,
+  },
   cardBody: {
     flex: 1,
   },
@@ -124,11 +160,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
+  topicPillEngaged: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accentLight,
+  },
   topicText: {
     fontSize: 10,
     color: Colors.accent,
     letterSpacing: 1.5,
     fontWeight: '600',
+  },
+  topicTextEngaged: {
+    color: Colors.textPrimary,
+  },
+  orbitPill: {
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: Colors.accentGlow,
+  },
+  orbitText: {
+    fontSize: 10,
+    color: Colors.accent,
+    letterSpacing: 1.5,
+    fontWeight: '600',
+  },
+  seriesLabel: {
+    fontSize: Typography.xs,
+    color: Colors.seriesBlue,
+    letterSpacing: 1,
+    fontWeight: Typography.semibold,
+    marginTop: Spacing.md,
   },
   title: {
     fontSize: 32,

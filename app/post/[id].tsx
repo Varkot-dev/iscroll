@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   StyleSheet,
   Linking,
@@ -13,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Post } from '@/types';
 import { Colors, Typography, Spacing } from '@/constants/colors';
+import { getPostsByTopic } from '@/lib/posts';
 
 export default function PostDetailScreen() {
   const { post: postJson } = useLocalSearchParams<{ id: string; post: string }>();
@@ -20,6 +22,15 @@ export default function PostDetailScreen() {
   const insets = useSafeAreaInsets();
 
   const post: Post = JSON.parse(postJson);
+  const [relatedPosts, setRelatedPosts] = useState<Post[]>([]);
+
+  useEffect(() => {
+    if (post.topics.length === 0) return;
+    getPostsByTopic(post.topics[0], { limit: 6 }).then(({ data }) => {
+      // exclude the current post
+      setRelatedPosts((data || []).filter(p => p.id !== post.id).slice(0, 5));
+    });
+  }, [post.id, post.topics[0]]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -85,6 +96,31 @@ export default function PostDetailScreen() {
           >
             <Text style={styles.sourceButtonText}>Read original source →</Text>
           </TouchableOpacity>
+        )}
+
+        {/* Related by topic rail */}
+        {relatedPosts.length > 0 && (
+          <View style={styles.relatedSection}>
+            <Text style={styles.relatedLabel}>MORE ON {post.topics[0]?.toUpperCase()}</Text>
+            <FlatList
+              data={relatedPosts}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styles.relatedList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.relatedCard}
+                  onPress={() => router.replace({ pathname: '/post/[id]', params: { id: item.id, post: JSON.stringify(item) } })}
+                >
+                  {item.topics.length > 0 && (
+                    <Text style={styles.relatedCardTopic}>{item.topics[0].toUpperCase()}</Text>
+                  )}
+                  <Text style={styles.relatedCardTitle} numberOfLines={3}>{item.title}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
         )}
       </ScrollView>
     </View>
@@ -206,5 +242,42 @@ const styles = StyleSheet.create({
     fontSize: Typography.base,
     color: Colors.accent,
     fontWeight: Typography.medium,
+  },
+  relatedSection: {
+    marginTop: Spacing['3xl'],
+    marginHorizontal: -Spacing.lg,
+  },
+  relatedLabel: {
+    fontSize: Typography.xs,
+    color: Colors.accent,
+    letterSpacing: 2,
+    fontWeight: Typography.semibold,
+    marginBottom: Spacing.md,
+    marginHorizontal: Spacing.lg,
+  },
+  relatedList: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.md,
+  },
+  relatedCard: {
+    width: 160,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  relatedCardTopic: {
+    fontSize: Typography.xs,
+    color: Colors.accent,
+    letterSpacing: 1.5,
+    fontWeight: Typography.semibold,
+    marginBottom: Spacing.xs,
+  },
+  relatedCardTitle: {
+    fontSize: Typography.sm,
+    color: Colors.textPrimary,
+    fontWeight: Typography.semibold,
+    lineHeight: Typography.sm * 1.4,
   },
 });
