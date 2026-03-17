@@ -1,227 +1,197 @@
-# iScroll v2.0 - Rabbit Holes
+# iScroll
 
-**Learn by following fascinating rabbit holes.** Transform from passive random facts to active narrative engagement with AI-generated episodic content and automated real-time updates.
+A TikTok-style full-screen snap-scroll learning feed built with React Native + Expo. Each card is a ~150-word concept. Cards chain into related concepts. The feed adapts based on engagement signals.
 
-![iScroll](./assets/icon.png)
+---
 
-## What's New in v2.0
+## Architecture
 
-- 🐰 **Rabbit Holes**: Follow curated topics with episodic content
-- 📺 **Episodes**: Narrative-driven learning in bite-sized chunks
-- 🔔 **Subscriptions**: Get notified when new episodes drop
-- 🔥 **FOMO Design**: Engagement-focused UI with urgency badges
-- 🤖 **AI Content**: Google Gemini-powered content generation (FREE)
-- 📰 **News Updates**: Automated content from real news (FREE)
+### Data Flow
+```
+Supabase → lib/posts.ts → usePostFeed → index.tsx → LearnCard
+```
 
-## Quick Start
+Each layer has exactly one job:
 
-### 1. Install Dependencies
+| File | Responsibility |
+|------|---------------|
+| `lib/posts.ts` | Supabase queries only. No React, no UI. |
+| `hooks/usePostFeed.ts` | Feed state and pagination logic only. |
+| `components/LearnCard.tsx` | Renders one card. No data fetching. |
+| `app/(tabs)/index.tsx` | Wires hook + component together. |
+| `types/index.ts` | Data shapes only. |
+
+### Pagination
+
+Cursor-based pagination anchored to `(published_at, id)` — not offset. Prevents duplicates when cards are injected mid-session via the chain mechanic. `loadingMoreRef` is a `useRef` mutex (not state) to block stacked fetches from rapid scrolling without triggering re-renders.
+
+### Chain Mechanic
+
+Tapping "Explore → X" on a card calls `appendItemAt(post, currentIndex)` — splices the related card directly after the current position in the feed array, then scrolls to it. If the card is already in the feed, scrolls to the existing position. No feed reload.
+
+### Engagement Tracking
+
+Every `view` (>1s dwell), `chain_tap`, `save`, and `unsave` writes to `engagement_events`. A Supabase view (`topic_engagement_scores`) aggregates weighted scores per user per topic. The feed reads this on load to identify "in orbit" topics and surfaces that signal on the card UI.
+
+Non-critical: all engagement writes are wrapped in try/catch and log warnings on failure. A failed track event never crashes the UX.
+
+---
+
+## Database Schema
+
+```sql
+posts
+  id uuid PK
+  title text
+  content text
+  summary text
+  wow_fact text
+  depth integer          -- 1 (surface) to 5 (expert)
+  source_url text
+  related_post_id uuid   -- FK posts(id), drives chain mechanic
+  related_post_title text -- denormalized for chain button display
+  series_id uuid         -- groups cards from the same source article
+  series_position integer
+  series_total integer
+  series_title text
+  published_at timestamptz
+
+post_topics
+  post_id uuid FK
+  topic text
+  kind text              -- 'topic' | 'subtopic'
+
+saved_posts
+  user_id text
+  post_id uuid FK
+  saved_at timestamptz
+
+engagement_events
+  user_id text
+  post_id uuid FK
+  event_type text        -- 'view' | 'chain_tap' | 'save' | 'unsave'
+  duration_ms integer    -- only for view events
+  created_at timestamptz
+
+-- Materialized view
+topic_engagement_scores
+  user_id text
+  topic text
+  score numeric          -- weighted aggregate
+  event_count integer
+  last_engaged_at timestamptz
+```
+
+### Constraints
+- `related_post_id` CHECK `(related_post_id IS DISTINCT FROM id)` — no self-chains
+- `related_post_id` ON DELETE SET NULL — deleting a card does not cascade
+
+---
+
+## Key Design Decisions
+
+**Why cursor pagination over offset?** Offset pagination breaks when cards are inserted mid-session via chain injections. A `(published_at, id)` cursor is stable regardless of insertions.
+
+**Why `useRef` for the loading mutex?** Changing a ref does not trigger a re-render. A loading mutex is an implementation detail, not UI state — `useState` would cause unnecessary re-renders on every scroll event.
+
+**Why `transformPost`?** Walls off raw DB column names (`wow_fact`, `related_post_id`) from app camelCase. If the schema changes, only `transformPost` needs updating.
+
+**Why pass serialized post to detail screen?** The detail screen receives the full post as a JSON param — no extra DB fetch on tap. The data is already in memory from the feed.
+
+**Why `seriesBlue` for the progress bar?** Series context is distinct from topic engagement (accent). Using a separate color (`#7890c8`) makes the two systems visually separable at a glance.
+
+---
+
+## Feed UI
+
+### LearnCard
+Full-screen card with:
+- Series progress bar — fills left to right based on `seriesPosition / seriesTotal`
+- Topic pills — filled background + "IN YOUR ORBIT" badge when user has high engagement on that topic
+- Title, content, SIGNAL callout box (`wowFact`)
+- Chain button — injects next related card into feed at current position
+- Bookmark toggle — persists to `saved_posts`
+- Tap anywhere on card body — opens detail screen
+
+### Detail Screen (`app/post/[id].tsx`)
+- Full content
+- DIVE DEEPER — filled subtopic pills
+- SIGNAL callout
+- Source link via `Linking.openURL`
+- Related by topic rail — horizontal strip of up to 5 cards sharing the same primary topic
+
+### Saved Tab
+- List of bookmarked posts with topic, title, summary
+- Pull to refresh
+- Inline unsave
+
+---
+
+## Setup
+
+### 1. Install
 
 ```bash
 npm install
 ```
 
-### 2. Set Up Environment
+### 2. Environment
 
-Create a `.env` file in the project root:
+Create `.env` in the project root:
 
 ```bash
-# Supabase (required)
 EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-
-# AI Content Generation (optional - for generating new content)
-EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
-
-# News Integration (optional - for automated updates)
-EXPO_PUBLIC_NEWS_API_KEY=your_newsapi_key
 ```
 
-### 3. Set Up Database
+### 3. Database
 
-1. Go to your Supabase project dashboard
-2. Click "SQL Editor" in the left sidebar
-3. Copy the contents of `supabase/schema.sql`
-4. Click "Run" to create all tables
+Run migrations in order in the Supabase SQL editor:
 
-### 4. Seed Content
+```
+supabase/schema-posts.sql
+supabase/migration-add-chain-fields.sql
+supabase/migration-add-series-fields.sql
+```
 
-Populate the database with starter content:
+### 4. Seed
 
 ```bash
 npm run seed
 ```
 
-### 5. Start the App
+Inserts 50 learn cards across 12 topic chains. Two-pass: insert all cards first to collect UUIDs, then wire `related_post_id` chain links in a second pass.
+
+### 5. Start
 
 ```bash
-npm start
+npx expo start --clear
 ```
 
-Then scan the QR code with Expo Go (mobile) or press `w` for web.
-
-## API Keys (All FREE)
-
-### Supabase
-- Get from: [supabase.com](https://supabase.com)
-- Free tier: 500MB database, 2GB bandwidth
-
-### Google Gemini API (optional)
-- Get from: [ai.google.dev](https://ai.google.dev)
-- Free tier: 1,500 requests/day
-- No credit card required
-
-### NewsAPI (optional)
-- Get from: [newsapi.org/register](https://newsapi.org/register)
-- Free tier: 100 requests/day
-- No credit card required
-
-## Project Structure
-
-```
-iscroll/
-├── app/                    # Screens (Expo Router)
-│   ├── (tabs)/            # Tab navigation
-│   │   ├── index.tsx      # Feed screen
-│   │   └── saved.tsx      # Subscriptions screen
-│   ├── rabbit-hole/       # Rabbit hole views
-│   │   └── [id].tsx
-│   └── episode/           # Episode readers
-│       └── [id].tsx
-├── components/            # UI Components
-│   ├── Badge.tsx          # Status badges
-│   ├── FeedCard.tsx       # Feed item cards
-│   ├── RabbitHoleView.tsx # Full rabbit hole display
-│   └── EpisodeView.tsx    # Episode content
-├── constants/
-│   └── colors.ts          # Design tokens
-├── hooks/
-│   ├── useFeed.ts         # Feed algorithm
-│   └── useSubscriptions.ts# Subscription state
-├── lib/
-│   ├── supabase.ts        # Database client
-│   ├── rabbit-holes.ts    # Database operations
-│   ├── ai-content.ts      # AI generation
-│   └── news-aggregator.ts # News fetching
-├── scripts/
-│   └── seed-content.ts    # Content seeding
-├── supabase/
-│   └── schema.sql         # Database schema
-└── types/
-    └── index.ts           # TypeScript types
-```
-
-## Database Schema
-
-### Core Tables
-
-- **rabbit_holes**: Topics users can follow
-- **episodes**: Content pieces within rabbit holes
-- **subscriptions**: User follows
-- **rabbit_hole_topics**: Topic tags
-- **user_progress**: Reading tracking
-
-### Feed Algorithm
-
-The feed prioritizes content in this order:
-1. **Subscription updates** (30%) - New episodes in followed topics
-2. **Continue watching** (20%) - Unfinished rabbit holes
-3. **Discovery** (40%) - New topics based on interests
-4. **Trending** (10%) - Popular content
-
-## Design System
-
-### Colors
-
-```typescript
-// Engagement colors
-urgentRed: '#f91880',     // NEW badges
-liveGreen: '#00ba7c',     // LIVE content
-seriesBlue: '#7856ff',    // SERIES badge
-warningAmber: '#ffb84d',  // Update counts
-
-// Base colors
-background: '#000000',
-accent: '#1d9bf0',
-```
-
-### Badge Types
-
-- `NEW` - Unread content (hot pink)
-- `LIVE` - Ongoing updates (green)
-- `SERIES` - Structured courses (purple)
-- `UPDATES` - Episode counts (amber)
-
-## Seed Content
-
-The seed script includes 5 pre-written rabbit holes:
-
-1. **The AI Alignment Problem** (live) - AI safety and ethics
-2. **How Nuclear Fusion Works** (live) - Physics breakthrough
-3. **The Fall of Rome** (series) - Historical journey
-4. **Your Brain on Dopamine** (series) - Neuroscience
-5. **Race to Quantum Computing** (live) - Tech frontier
-
-Each rabbit hole has 2-3 episodes with narrative content.
+---
 
 ## Scripts
 
 ```bash
-# Start development server
-npm start
-
-# Seed database with content
-npm run seed
-
-# Run on iOS simulator
-npm run ios
-
-# Run on Android emulator
-npm run android
-
-# Run in web browser
-npm run web
+npm run seed              # seed 50 learn cards to Supabase
+npx expo start            # start Metro bundler
+npx expo start --clear    # start with cleared Metro cache
+npx tsc --noEmit          # typecheck
 ```
-
-## Migration from v1.0
-
-The v2.0 update maintains backward compatibility:
-- `saved_items` table supports both Wikipedia IDs and episode IDs
-- Legacy Wikipedia feed is available via `useLegacyFeed()` hook
-- Existing routes (`/thread/[id]`) still work
-
-## Roadmap
-
-### Phase 2
-- [ ] Spaced repetition system
-- [ ] Push notifications
-- [ ] User authentication
-
-### Phase 3
-- [ ] User-generated content
-- [ ] Social features
-- [ ] Branching narratives
-
-## Cost Breakdown
-
-| Service | Free Tier | Monthly Cost |
-|---------|-----------|--------------|
-| Supabase | 500MB DB, 2GB bandwidth | $0 |
-| Google Gemini | 1,500 requests/day | $0 |
-| NewsAPI | 100 requests/day | $0 |
-| Expo | Unlimited | $0 |
-| **Total** | | **$0** |
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
-
-## License
-
-MIT License - feel free to use this for learning or building your own apps!
 
 ---
 
-Built with ❤️ using Expo, React Native, and Supabase
+## Stack
+
+- **React Native** via Expo SDK 54
+- **Expo Router** — file-based navigation
+- **Supabase** — Postgres backend
+- **TypeScript** — strict mode
+- **react-native-safe-area-context**
+- **@expo/vector-icons** — Ionicons
+
+---
+
+## Project Status
+
+Active development. Current focus: Wikipedia scraper for auto-generating card chains from source articles, series context system for grouping cards by origin article, adaptive depth feed algorithm.
